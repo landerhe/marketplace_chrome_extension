@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Facebook Marketplace Auto-Fill",
+  "version": "1.0.0",
+  "description": "Automatically fill Facebook Marketplace listing forms from data.json",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://facebook.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/marketplace/create/*",
+        "https://facebook.com/marketplace/create/*",
+        "https://www.facebook.com/*/marketplace/create/*",
+        "https://facebook.com/*/marketplace/create/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data.json",
+        "images/*.jpg",
+        "frame.png"
+      ],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*"
+      ]
+    }
+  ]
+}
+
