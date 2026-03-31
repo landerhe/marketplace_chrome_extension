@@ -1,38 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Facebook Marketplace Auto-Fill",
-  "version": "1.0.0",
-  "description": "Automatically fill Facebook Marketplace listing forms from data.json",
+  "name": "AutoList for Facebook Marketplace - Bulk Lister & Automation",
+  "version": "2.0.0",
+  "description": "Bulk upload and fill Facebook Marketplace listings. Auto-fill titles, prices, descriptions, and IMAGEs.",
   "permissions": [
     "activeTab",
+    "scripting",
     "storage",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://www.facebook.com/*",
-    "https://facebook.com/*"
+    "unlimitedStorage"
   ],
   "action": {
     "default_popup": "popup.html"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.facebook.com/marketplace/create/*",
-        "https://facebook.com/marketplace/create/*",
-        "https://www.facebook.com/*/marketplace/create/*",
-        "https://facebook.com/*/marketplace/create/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "web_accessible_resources": [
     {
       "resources": [
         "data.json",
-        "images/*.jpg",
-        "frame.png"
+        "images/*.jpg"
       ],
       "matches": [
         "https://www.facebook.com/*",

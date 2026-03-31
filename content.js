@@ -23,13 +23,30 @@ async function fillForm(item, hideFromFriends = false) {
     // Wait for form to be ready
     await waitForForm();
     
+    // Reconstruct File objects from ArrayBuffers if needed
+    let images = item.images || [];
+    if (images.length > 0 && !(images[0] instanceof File)) {
+      images = images.map(imgData => {
+        if (imgData.arrayBuffer) {
+          // Reconstruct File from ArrayBuffer
+          const uint8Array = new Uint8Array(imgData.arrayBuffer);
+          const blob = new Blob([uint8Array], { type: imgData.type || 'image/jpeg' });
+          return new File([blob], imgData.filename, {
+            type: imgData.type || 'image/jpeg',
+            lastModified: imgData.lastModified || Date.now()
+          });
+        }
+        return imgData;
+      }).filter(f => f instanceof File);
+    }
+    
     // Fill fields in sequence
     await fillTitle(item.title);
     await fillPrice(item.price);
     await fillCategory(item.category);
     await fillCondition(item.condition);
     await fillDescription(item);
-    await uploadImages(item.images);
+    await uploadImages(images);
     await setHideFromFriends(hideFromFriends);
     
     return { success: true };
@@ -117,58 +134,110 @@ function findPriceField() {
 }
 
 function findCategoryField() {
-  // Look for span with "Category" text, then find combobox in same container
+  // Strategy 1: Find by aria-labelledby pointing to a span with "Category" text
   const categorySpans = Array.from(document.querySelectorAll('span')).filter(el => {
     const text = el.textContent?.trim().toLowerCase();
     return text === 'category';
   });
   
   for (const span of categorySpans) {
-    const container = span.closest('label') || span.closest('div');
-    if (container) {
-      const combobox = container.querySelector('[role="combobox"]');
-      if (combobox) return combobox;
+    const spanId = span.id;
+    if (spanId) {
+      // Find label/combobox that references this span
+      const field = document.querySelector(`label[aria-labelledby="${spanId}"][role="combobox"], 
+                                            [role="combobox"][aria-labelledby="${spanId}"]`);
+      if (field) return field;
     }
   }
   
-  // Fallback
-  const selectors = [
-    '[role="combobox"][aria-label*="Category" i]',
-    '[role="combobox"][aria-labelledby*="category" i]'
-  ];
+  // Strategy 2: Find label with role="combobox" that contains "Category" span
+  for (const span of categorySpans) {
+    // Walk up the DOM to find the combobox
+    let parent = span.parentElement;
+    let depth = 0;
+    while (parent && depth < 10) {
+      if (parent.getAttribute('role') === 'combobox' || 
+          (parent.tagName === 'LABEL' && parent.getAttribute('role') === 'combobox')) {
+        return parent;
+      }
+      parent = parent.parentElement;
+      depth++;
+    }
+  }
   
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element) return element;
+  // Strategy 3: Find all comboboxes and check their labels
+  const allComboboxes = document.querySelectorAll('[role="combobox"]');
+  for (const combobox of allComboboxes) {
+    const labelledBy = combobox.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const labelEl = document.getElementById(labelledBy);
+      if (labelEl && labelEl.textContent?.trim().toLowerCase() === 'category') {
+        return combobox;
+      }
+    }
+    const ariaLabel = combobox.getAttribute('aria-label')?.toLowerCase() || '';
+    if (ariaLabel.includes('category')) {
+      return combobox;
+    }
+    // Check if it contains a span with "Category"
+    if (combobox.querySelector('span')?.textContent?.trim().toLowerCase() === 'category') {
+      return combobox;
+    }
   }
   
   return null;
 }
 
 function findConditionField() {
-  // Look for span with "Condition" text, then find combobox in same container
+  // Strategy 1: Find by aria-labelledby pointing to a span with "Condition" text
   const conditionSpans = Array.from(document.querySelectorAll('span')).filter(el => {
     const text = el.textContent?.trim().toLowerCase();
     return text === 'condition';
   });
   
   for (const span of conditionSpans) {
-    const container = span.closest('label') || span.closest('div');
-    if (container) {
-      const combobox = container.querySelector('[role="combobox"]');
-      if (combobox) return combobox;
+    const spanId = span.id;
+    if (spanId) {
+      // Find label/combobox that references this span
+      const field = document.querySelector(`label[aria-labelledby="${spanId}"][role="combobox"], 
+                                            [role="combobox"][aria-labelledby="${spanId}"]`);
+      if (field) return field;
     }
   }
   
-  // Fallback
-  const selectors = [
-    '[role="combobox"][aria-label*="Condition" i]',
-    '[role="combobox"][aria-labelledby*="condition" i]'
-  ];
+  // Strategy 2: Find label with role="combobox" that contains "Condition" span
+  for (const span of conditionSpans) {
+    // Walk up the DOM to find the combobox
+    let parent = span.parentElement;
+    let depth = 0;
+    while (parent && depth < 10) {
+      if (parent.getAttribute('role') === 'combobox' || 
+          (parent.tagName === 'LABEL' && parent.getAttribute('role') === 'combobox')) {
+        return parent;
+      }
+      parent = parent.parentElement;
+      depth++;
+    }
+  }
   
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element) return element;
+  // Strategy 3: Find all comboboxes and check their labels
+  const allComboboxes = document.querySelectorAll('[role="combobox"]');
+  for (const combobox of allComboboxes) {
+    const labelledBy = combobox.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const labelEl = document.getElementById(labelledBy);
+      if (labelEl && labelEl.textContent?.trim().toLowerCase() === 'condition') {
+        return combobox;
+      }
+    }
+    const ariaLabel = combobox.getAttribute('aria-label')?.toLowerCase() || '';
+    if (ariaLabel.includes('condition')) {
+      return combobox;
+    }
+    // Check if it contains a span with "Condition"
+    if (combobox.querySelector('span')?.textContent?.trim().toLowerCase() === 'condition') {
+      return combobox;
+    }
   }
   
   return null;
@@ -254,143 +323,267 @@ async function fillPrice(price) {
   await delay(200);
 }
 
-async function fillCategory(category) {
-  const field = findCategoryField();
+// Helper function to normalize text for comparison
+function normalizeText(text) {
+  if (!text) return '';
+  // Decode HTML entities
+  const temp = document.createElement('div');
+  temp.innerHTML = text;
+  let decoded = temp.textContent || temp.innerText || '';
+  // Normalize: lowercase, trim, collapse whitespace
+  return decoded.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Simplified function to select dropdown option
+async function selectDropdownOption(fieldName, valueToSelect) {
+  if (!valueToSelect || !valueToSelect.trim()) {
+    return false;
+  }
+  
+  // Find the field
+  const field = fieldName === 'category' ? findCategoryField() : findConditionField();
   if (!field) {
-    console.warn('Category field not found');
-    return;
+    console.warn(`${fieldName} field not found`);
+    return false;
   }
   
-  // Use default category if not provided
-  const categoryToUse = category || "Men's clothing & shoes";
+  const searchValue = normalizeText(valueToSelect.trim());
   
-  // Check if already selected
-  const currentValue = field.textContent?.trim() || '';
-  if (currentValue.toLowerCase().includes(categoryToUse.toLowerCase())) {
-    console.log('Category already set to:', currentValue);
-    return;
+  // Check if already selected by looking at the displayed value
+  const displayedSpan = field.querySelector('span.x6ikm8r, span[class*="x6ikm8r"]');
+  if (displayedSpan) {
+    const currentText = displayedSpan.textContent?.trim();
+    if (currentText && currentText !== '&nbsp;') {
+      if (normalizeText(currentText) === searchValue) {
+        console.log(`${fieldName} already set to:`, currentText);
+        return true;
+      }
+    }
   }
   
-  // Click to open dropdown
+  // Open the dropdown by clicking
   field.click();
-  await delay(600);
+  await delay(1000); // Give time for dropdown to render
   
-  // Wait for dropdown to appear
-  await delay(300);
-  
-  // Try to find and click the category option
-  const options = document.querySelectorAll('[role="option"], [role="listbox"] [role="option"], div[role="option"]');
-  let found = false;
-  
-  for (const option of options) {
-    const text = option.textContent?.trim().toLowerCase() || '';
-    const searchText = categoryToUse.toLowerCase();
+  // Wait for dropdown menu to appear - check for both dialog and listbox patterns
+  let dropdownMenu = null;
+  for (let i = 0; i < 10; i++) {
+    // Check for dialog pattern (used by category)
+    const dialogs = document.querySelectorAll('[role="dialog"]');
+    for (const dialog of dialogs) {
+      const ariaLabel = (dialog.getAttribute('aria-label') || '').toLowerCase();
+      const rect = dialog.getBoundingClientRect();
+      if ((ariaLabel.includes('drop-down menu') || ariaLabel.includes('dropdown')) &&
+          rect.width > 0 && rect.height > 0) {
+        dropdownMenu = dialog;
+        break;
+      }
+    }
     
-    // Try exact match or partial match
-    if (text === searchText || text.includes(searchText) || searchText.includes(text)) {
+    // Check for listbox pattern (used by condition)
+    if (!dropdownMenu) {
+      const listboxes = document.querySelectorAll('[role="listbox"]');
+      for (const listbox of listboxes) {
+        const rect = listbox.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          dropdownMenu = listbox;
+          break;
+        }
+      }
+    }
+    
+    // Also check for any visible dropdown container near the field
+    if (!dropdownMenu) {
+      const fieldRect = field.getBoundingClientRect();
+      const allDropdowns = document.querySelectorAll('[role="dialog"], [role="listbox"]');
+      for (const dropdown of allDropdowns) {
+        const rect = dropdown.getBoundingClientRect();
+        // Check if dropdown is visible and positioned near the field
+        if (rect.width > 0 && rect.height > 0 && 
+            Math.abs(rect.top - fieldRect.bottom) < 500) {
+          dropdownMenu = dropdown;
+          break;
+        }
+      }
+    }
+    
+    if (dropdownMenu) break;
+    await delay(200);
+  }
+  
+  if (!dropdownMenu) {
+    console.warn(`${fieldName} dropdown did not open`);
+    console.log('Field found:', field);
+    console.log('Field aria-haspopup:', field.getAttribute('aria-haspopup'));
+    return false;
+  }
+  
+  console.log(`${fieldName} dropdown opened, type:`, dropdownMenu.getAttribute('role'));
+  
+  // Find all clickable options - try multiple patterns
+  let options = [];
+  
+  // Pattern 1: role="button" inside dialog (category pattern)
+  const allButtons = dropdownMenu.querySelectorAll('[role="button"]:not([aria-disabled="true"])');
+  options = Array.from(allButtons).filter(btn => {
+    // Skip headers
+    const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+    const text = (btn.textContent || '').toLowerCase();
+    return !ariaLabel.includes('header') && !text.includes('header');
+  });
+  
+  // Pattern 2: role="option" inside listbox (condition pattern)
+  if (options.length === 0) {
+    const allOptions = dropdownMenu.querySelectorAll('[role="option"]:not([aria-disabled="true"])');
+    options = Array.from(allOptions);
+  }
+  
+  // Pattern 3: Any clickable div with tabindex
+  if (options.length === 0) {
+    const clickableDivs = dropdownMenu.querySelectorAll('div[tabindex="0"], div[tabindex="0"]');
+    options = Array.from(clickableDivs).filter(div => {
+      const text = (div.textContent || '').toLowerCase();
+      return !text.includes('header') && text.trim().length > 0;
+    });
+  }
+  
+  console.log(`Found ${options.length} ${fieldName} options`);
+  
+  if (options.length === 0) {
+    console.warn(`No ${fieldName} options found in dropdown`);
+    console.log('Dropdown HTML:', dropdownMenu.outerHTML.substring(0, 500));
+    // Close dropdown
+    document.body.click();
+    return false;
+  }
+  
+  // Find matching option
+  let selected = false;
+  for (const option of options) {
+    // Extract the main text from the option - try multiple methods
+    let optionText = '';
+    
+    // Method 1: Look for span with dir="auto" (most common pattern)
+    const textSpans = option.querySelectorAll('span[dir="auto"]');
+    for (const span of textSpans) {
+      const text = span.textContent?.trim();
+      if (text && 
+          !text.toLowerCase().includes('header') &&
+          !text.toLowerCase().includes('delivery available') &&
+          text.length > 0) {
+        optionText = text;
+        break;
+      }
+    }
+    
+    // Method 2: Look for span with specific classes that contain text
+    if (!optionText) {
+      const allSpans = option.querySelectorAll('span');
+      for (const span of allSpans) {
+        const text = span.textContent?.trim();
+        // Skip if it's just whitespace, header, or metadata
+        if (text && 
+            text.length > 0 &&
+            !text.match(/^[\s\u00A0]*$/) &&
+            !text.toLowerCase().includes('header') &&
+            !text.toLowerCase().includes('delivery available')) {
+          // Prefer spans that look like main text (not too short, not just punctuation)
+          if (text.length > 2 && !text.match(/^[^\w]*$/)) {
+            optionText = text;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Method 3: Use all text but clean it (last resort)
+    if (!optionText) {
+      optionText = option.textContent?.trim() || '';
+      // Remove common metadata
+      optionText = optionText
+        .replace(/delivery available/gi, '')
+        .replace(/header/gi, '')
+        .trim();
+    }
+    
+    if (!optionText || optionText.length === 0) continue;
+    
+    // Compare normalized texts
+    const normalizedOption = normalizeText(optionText);
+    console.log(`Comparing "${normalizedOption}" with "${searchValue}"`);
+    
+    if (normalizedOption === searchValue ||
+        normalizedOption.includes(searchValue) ||
+        searchValue.includes(normalizedOption)) {
+      console.log(`Match found! Clicking option: "${optionText}"`);
+      // Click the option
       option.click();
-      await delay(400);
-      found = true;
+      await delay(600);
+      
+      // Dispatch change event on the field to ensure Facebook detects it
+      const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+      field.dispatchEvent(changeEvent);
+      
+      // Also try input event
+      const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+      field.dispatchEvent(inputEvent);
+      
+      selected = true;
       break;
     }
   }
   
-  // If not found, try searching for common categories
-  if (!found) {
-    const commonCategories = [
-      "men's clothing",
-      "women's clothing",
-      "clothing",
-      "shoes",
-      "accessories"
-    ];
+  if (!selected) {
+    console.warn(`${fieldName} option not found for:`, valueToSelect);
+    console.log(`Searching for normalized value: "${searchValue}"`);
     
-    for (const commonCat of commonCategories) {
-      for (const option of options) {
-        const text = option.textContent?.trim().toLowerCase() || '';
-        if (text.includes(commonCat)) {
-          option.click();
-          await delay(400);
-          found = true;
+    // Log available options for debugging
+    const availableOptions = [];
+    for (const opt of options) {
+      // Try to extract text the same way we do for matching
+      let text = '';
+      const textSpans = opt.querySelectorAll('span[dir="auto"]');
+      for (const span of textSpans) {
+        const spanText = span.textContent?.trim();
+        if (spanText && 
+            !spanText.toLowerCase().includes('header') &&
+            !spanText.toLowerCase().includes('delivery available') &&
+            spanText.length > 0) {
+          text = spanText;
           break;
         }
       }
-      if (found) break;
+      if (!text) {
+        text = opt.textContent?.trim() || '';
+        text = text.replace(/delivery available/gi, '').replace(/header/gi, '').trim();
+      }
+      if (text) {
+        availableOptions.push({
+          text: text,
+          normalized: normalizeText(text),
+          element: opt
+        });
+      }
     }
+    
+    console.log(`Available ${fieldName} options (${availableOptions.length}):`);
+    availableOptions.forEach((opt, idx) => {
+      console.log(`  ${idx + 1}. "${opt.text}" (normalized: "${opt.normalized}")`);
+    });
+    
+    // Close dropdown
+    document.body.click();
   }
   
-  // If still not found, close dropdown
-  if (!found) {
-    document.body.click();
-    await delay(200);
-    console.warn('Category option not found:', categoryToUse);
-  }
+  return selected;
+}
+
+async function fillCategory(category) {
+  await selectDropdownOption('category', category);
 }
 
 async function fillCondition(condition) {
-  const field = findConditionField();
-  if (!field) {
-    console.warn('Condition field not found');
-    return;
-  }
-  
-  // Map condition values to Facebook's condition options
-  const conditionMap = {
-    'worn': ['used – fair', 'used - fair', 'fair', 'used', 'good'],
-    'rarely worn': ['used – like new', 'used - like new', 'like new', 'excellent', 'very good'],
-    'new': ['new', 'new with tags', 'new without tags']
-  };
-  
-  const conditionLower = (condition || 'worn').toLowerCase().trim();
-  const searchTerms = conditionMap[conditionLower] || [conditionLower];
-  
-  // Check if already selected
-  const currentValue = field.textContent?.trim() || '';
-  for (const term of searchTerms) {
-    if (currentValue.toLowerCase().includes(term)) {
-      console.log('Condition already set to:', currentValue);
-      return;
-    }
-  }
-  
-  // Click to open dropdown
-  field.click();
-  await delay(600);
-  
-  // Wait for dropdown to appear
-  await delay(300);
-  
-  // Try to find and click the condition option
-  const options = document.querySelectorAll('[role="option"], [role="listbox"] [role="option"], div[role="option"]');
-  let found = false;
-  
-  for (const option of options) {
-    const text = option.textContent?.trim().toLowerCase() || '';
-    for (const term of searchTerms) {
-      if (text === term || text.includes(term) || term.includes(text)) {
-        option.click();
-        await delay(400);
-        found = true;
-        break;
-      }
-    }
-    if (found) break;
-  }
-  
-  // If not found, try to select first available option as fallback
-  if (!found && options.length > 0) {
-    console.warn('Exact condition match not found, selecting first option');
-    options[0].click();
-    await delay(400);
-    found = true;
-  }
-  
-  // If still not found, close dropdown
-  if (!found) {
-    document.body.click();
-    await delay(200);
-    console.warn('Condition option not found for:', condition);
-  }
+  await selectDropdownOption('condition', condition);
 }
 
 async function fillDescription(item) {
@@ -401,8 +594,16 @@ async function fillDescription(item) {
   if (item.materials) parts.push(`Materials: ${item.materials}`);
   if (item.condition) parts.push(`Condition: ${item.condition}`);
   
-  // Add the standard message about QR code
-  parts.push('There are many items that I am selling in the QR provided');
+  // Add custom description text from settings if set
+  try {
+    const settings = await chrome.storage.local.get('extensionSettings');
+    const customDescription = settings.extensionSettings?.customDescription || '';
+    if (customDescription && customDescription.trim()) {
+      parts.push(customDescription.trim());
+    }
+  } catch (error) {
+    console.warn('Error loading custom description:', error);
+  }
   
   const description = parts.join('\n\n');
   if (!description) return;
@@ -420,6 +621,77 @@ async function fillDescription(item) {
   await delay(200);
 }
 
+// Convert image to JPEG using Canvas (for unsupported formats)
+async function convertToJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      
+      // White background for transparency
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Conversion failed'));
+          return;
+        }
+        const jpegFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+        resolve(jpegFile);
+      }, 'image/jpeg', 0.95);
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    
+    img.src = url;
+  });
+}
+
+// Ensure file is in Facebook-supported format
+async function ensureSupportedFormat(file) {
+  const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  
+  // If not supported, convert to JPEG
+  if (!supportedTypes.includes(file.type)) {
+    console.log(`Converting ${file.name} (${file.type}) to JPEG`);
+    return await convertToJpeg(file);
+  }
+  
+  // Ensure proper MIME type
+  let mimeType = file.type;
+  if (!mimeType || mimeType === 'application/octet-stream') {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+    else if (ext === 'png') mimeType = 'image/png';
+    else if (ext === 'gif') mimeType = 'image/gif';
+    else mimeType = 'image/jpeg';
+  }
+  
+  // If type changed, create new File object
+  if (file.type !== mimeType) {
+    return new File([file], file.name, {
+      type: mimeType,
+      lastModified: file.lastModified || Date.now()
+    });
+  }
+  
+  return file;
+}
+
 async function uploadImages(images) {
   const input = findImageInput();
   if (!input) {
@@ -427,71 +699,51 @@ async function uploadImages(images) {
     return;
   }
   
-  // Always include frame.png as the last image
   const allFiles = [];
   
-  // Add item images first (limit to 9 to leave room for frame.png)
+  // Add item images (Facebook allows up to 10 images)
   if (images && images.length > 0) {
-    const itemImages = images.slice(0, 9);
+    const itemImages = images.slice(0, 10);
     
     try {
-      const itemFiles = await Promise.all(
-        itemImages.map(async (image) => {
-          try {
-            const imagePath = image.local || image.primary || image.fallback;
-            if (!imagePath) return null;
-            
-            // Normalize path: remove leading ./ and ensure it starts with images/
-            let normalizedPath = imagePath.replace(/^\.\//, '').replace(/^\//, '');
-            if (!normalizedPath.startsWith('images/')) {
-              normalizedPath = 'images/' + normalizedPath.replace(/^images\//, '');
-            }
-            
-            // Convert relative path to extension URL
-            const extensionUrl = chrome.runtime.getURL(normalizedPath);
-            
-            // Fetch image as blob
-            const response = await fetch(extensionUrl);
-            if (!response.ok) {
-              console.warn(`Failed to fetch image: ${normalizedPath}`, response.status);
-              return null;
-            }
-            
-            const blob = await response.blob();
-            
-            // Get filename from path
-            const filename = normalizedPath.split('/').pop() || 'image.jpg';
-            
-            // Create File object
-            return new File([blob], filename, { type: blob.type || 'image/jpeg' });
-          } catch (error) {
-            console.error('Error processing image:', image, error);
-            return null;
+      for (const image of itemImages) {
+        try {
+          // Image should be a File object passed from popup
+          let file = null;
+          
+          if (image instanceof File) {
+            // Direct File object
+            file = image;
+          } else if (image.blob instanceof Blob) {
+            // Has blob property - convert to File
+            const filename = image.filename || 'image.jpg';
+            file = new File([image.blob], filename, {
+              type: image.blob.type || 'image/jpeg',
+              lastModified: Date.now()
+            });
+          } else {
+            console.warn('Invalid image format:', image);
+            continue;
           }
-        })
-      );
-      
-      // Filter out nulls and add to allFiles
-      const validItemFiles = itemFiles.filter(f => f !== null);
-      allFiles.push(...validItemFiles);
+          
+          // Ensure supported format
+          file = await ensureSupportedFormat(file);
+          
+          // Validate
+          if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+            console.warn(`Skipping invalid file: ${file.name}, size: ${file.size}`);
+            continue;
+          }
+          
+          console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${(file.size/1024).toFixed(2)}KB`);
+          allFiles.push(file);
+        } catch (error) {
+          console.error('Error processing image:', error);
+        }
+      }
     } catch (error) {
       console.error('Error processing item images:', error);
     }
-  }
-  
-  // Add frame.png at the end
-  try {
-    const frameUrl = chrome.runtime.getURL('frame.png');
-    const frameResponse = await fetch(frameUrl);
-    if (frameResponse.ok) {
-      const frameBlob = await frameResponse.blob();
-      const frameFile = new File([frameBlob], 'frame.png', { type: frameBlob.type || 'image/png' });
-      allFiles.push(frameFile);
-    } else {
-      console.warn('frame.png not found, skipping');
-    }
-  } catch (error) {
-    console.warn('Error loading frame.png:', error);
   }
   
   if (allFiles.length === 0) {
@@ -499,17 +751,48 @@ async function uploadImages(images) {
     return;
   }
   
-  // Create FileList
-  const dataTransfer = new DataTransfer();
-  allFiles.forEach(file => dataTransfer.items.add(file));
+  if (allFiles.length === 0) {
+    console.warn('No files to upload');
+    return;
+  }
   
-  // Assign to input
+  // Validate files
+  const validFiles = allFiles.filter(file => {
+    if (!(file instanceof File)) {
+      console.warn('Not a File object:', file);
+      return false;
+    }
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      console.warn(`Invalid size for ${file.name}: ${file.size}`);
+      return false;
+    }
+    return true;
+  });
+  
+  if (validFiles.length === 0) {
+    console.error('No valid files');
+    return;
+  }
+  
+  console.log(`Uploading ${validFiles.length} files`);
+  validFiles.forEach((f, i) => {
+    console.log(`  ${i+1}. ${f.name} (${f.type}, ${(f.size/1024).toFixed(2)}KB)`);
+  });
+  
+  // Use DataTransfer to set files
+  const dataTransfer = new DataTransfer();
+  validFiles.forEach(file => {
+    dataTransfer.items.add(file);
+  });
+  
+  // Set files on input
   input.files = dataTransfer.files;
   
-  // Trigger change event
-  input.dispatchEvent(new Event('change', { bubbles: true }));
+  // Trigger events
+  input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+  input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
   
-  await delay(500);
+  await delay(800);
 }
 
 function findHideFromFriendsCheckbox() {

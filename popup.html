@@ -12,8 +12,8 @@
     }
 
     body {
-      width: 400px;
-      max-height: 600px;
+      width: 450px;
+      max-height: 700px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background: #f5f5f5;
     }
@@ -55,8 +55,112 @@
       border: 1px solid #ccf;
     }
 
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #ddd;
+      margin-bottom: 1rem;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.75rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: #666;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      color: #1877f2;
+      border-bottom-color: #1877f2;
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .upload-section {
+      background: white;
+      border: 2px dashed #ddd;
+      border-radius: 0.5rem;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+    }
+
+    .upload-section.drag-over {
+      border-color: #1877f2;
+      background: #e7f3ff;
+    }
+
+    .upload-section.has-files {
+      border-style: solid;
+      border-color: #1877f2;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-top: 0.5rem;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .file-input-button {
+      padding: 0.5rem 1rem;
+      background: #1877f2;
+      color: white;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .file-list {
+      margin-top: 1rem;
+      text-align: left;
+    }
+
+    .file-item {
+      padding: 0.5rem;
+      background: #f5f5f5;
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 0.5rem;
+      background: #e0e0e0;
+      border-radius: 0.25rem;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #1877f2;
+      transition: width 0.3s;
+    }
+
     .item-list {
-      max-height: 400px;
+      max-height: 350px;
       overflow-y: auto;
       margin-bottom: 1rem;
     }
@@ -123,6 +227,12 @@
       font-weight: 600;
     }
 
+    .item-images {
+      font-size: 0.75rem;
+      color: #999;
+      margin-top: 0.25rem;
+    }
+
     .button {
       width: 100%;
       padding: 0.75rem;
@@ -143,6 +253,15 @@
     .button:disabled {
       background: #ccc;
       cursor: not-allowed;
+    }
+
+    .button-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .button-secondary:hover:not(:disabled) {
+      background: #d0d0d0;
     }
 
     .loading {
@@ -214,6 +333,81 @@
     .toggle-switch.active::after {
       transform: translateX(1.25rem);
     }
+
+    .help-text {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #f9f9f9;
+      border-radius: 0.25rem;
+    }
+
+    .field-mapping {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .field-mapping-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .field-mapping-label {
+      flex: 1;
+      font-weight: 600;
+    }
+
+    .field-mapping-select {
+      flex: 2;
+      padding: 0.25rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+    }
+
+    .settings-section {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .settings-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .settings-description {
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    .settings-textarea {
+      width: 100%;
+      min-height: 5rem;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .settings-textarea:focus {
+      outline: none;
+      border-color: #1877f2;
+    }
   </style>
 </head>
 <body>
@@ -222,21 +416,101 @@
   </div>
   <div class="container">
     <div id="status" class="status" style="display: none;"></div>
-    <div id="item-list" class="item-list">
-      <div class="loading">Loading items...</div>
+    
+    <div class="tabs">
+      <button class="tab active" data-tab="csv">CSV</button>
+      <button class="tab" data-tab="images">Images</button>
+      <button class="tab" data-tab="items">Items</button>
+      <button class="tab" data-tab="settings">Settings</button>
     </div>
-    <div class="options">
-      <div class="option-row">
-        <div>
-          <div class="option-label">Hide from friends</div>
-          <div class="option-description">Hide this listing from your friends</div>
+
+    <!-- CSV Upload Tab -->
+    <div id="tab-csv" class="tab-content active">
+      <div class="upload-section" id="csv-upload-section">
+        <div>📄 Upload CSV File</div>
+        <div class="file-input-wrapper">
+          <input type="file" id="csv-file-input" accept=".csv,.txt" />
+          <label for="csv-file-input" class="file-input-button">Choose CSV File</label>
         </div>
-        <div id="hide-friends-toggle" class="toggle-switch" role="button" tabindex="0" aria-label="Hide from friends"></div>
+        <div class="help-text">
+          CSV should contain columns: Title, Price, Category, Condition, Description, etc.<br>
+          Values should match Facebook's exact field names.
+        </div>
+        <div id="csv-file-list" class="file-list" style="display: none;"></div>
+        <div id="csv-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="csv-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
       </div>
+      
+      <div id="field-mapping-section" class="field-mapping" style="display: none;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">Field Mapping</div>
+        <div id="field-mapping-list"></div>
+      </div>
+      
+      <button id="process-csv-button" class="button" style="display: none;">Process CSV</button>
     </div>
-    <button id="fill-button" class="button" disabled>Fill Form</button>
+
+    <!-- Image Upload Tab -->
+    <div id="tab-images" class="tab-content">
+      <div class="upload-section" id="image-upload-section">
+        <div>🖼️ Upload Images</div>
+        <div class="help-text">
+          Images should be named: Row{number}_{identifier}_{number}.{ext}<br>
+          Example: Row1_Item Name_1.jpg
+        </div>
+        <div class="file-input-wrapper">
+          <input type="file" id="image-file-input" accept="image/*" multiple />
+          <label for="image-file-input" class="file-input-button">Choose Images</label>
+        </div>
+        <div id="image-file-list" class="file-list"></div>
+        <div id="image-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="image-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+      <button id="process-images-button" class="button" style="display: none;">Match Images to Items</button>
+    </div>
+
+    <!-- Items Tab -->
+    <div id="tab-items" class="tab-content">
+      <div id="item-list" class="item-list">
+        <div class="empty">No items loaded. Please upload a CSV file first.</div>
+      </div>
+      
+      <div class="options">
+        <div class="option-row">
+          <div>
+            <div class="option-label">Hide from friends</div>
+            <div class="option-description">Hide this listing from your friends</div>
+          </div>
+          <div id="hide-friends-toggle" class="toggle-switch active" role="button" tabindex="0" aria-label="Hide from friends" aria-checked="true"></div>
+        </div>
+      </div>
+      
+      <button id="fill-button" class="button" disabled>Fill Form</button>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tab-settings" class="tab-content">
+      <div class="settings-section">
+        <div class="settings-label">Custom Description Text</div>
+        <div class="settings-description">
+          Optional text to append to each listing's description. Leave blank to not add any custom text.
+        </div>
+        <textarea id="custom-description-textarea" class="settings-textarea" placeholder="Enter custom description text (e.g., 'There are many items that I am selling in the QR provided')"></textarea>
+      </div>
+      <button id="save-settings-button" class="button">Save Settings</button>
+    </div>
   </div>
+
+  <script src="utils.js"></script>
+  <script src="storageManager.js"></script>
+  <script src="csvParser.js"></script>
+  <script src="fieldMapper.js"></script>
+  <script src="imageMatcher.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
-
