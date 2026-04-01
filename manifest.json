@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AutoList for Facebook Marketplace - Bulk Lister & Automation",
-  "version": "2.0.0",
+  "version": "2.1.1",
   "description": "Bulk upload and fill Facebook Marketplace listings. Auto-fill titles, prices, descriptions, and IMAGEs.",
   "permissions": [
     "activeTab",
@@ -9,8 +9,27 @@
     "storage",
     "unlimitedStorage"
   ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "64": "icons/icon64.png",
+    "128": "icons/icon128.png",
+    "256": "icons/icon256.png",
+    "512": "icons/icon512.png"
+  },
+  "host_permissions": [
+    "https://drive.google.com/*",
+    "https://docs.google.com/*",
+    "https://*.googleusercontent.com/*"
+  ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "web_accessible_resources": [
     {

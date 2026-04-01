@@ -7,6 +7,7 @@ let listedItems = new Set();
 let csvData = null;
 let uploadedImages = [];
 let currentTab = 'csv';
+let fillOperationInProgress = false;
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
@@ -22,9 +23,13 @@ function checkModules() {
   console.log('window.StorageManager:', typeof window.StorageManager);
   console.log('window.FieldMapper:', typeof window.FieldMapper);
   console.log('window.ImageMatcher:', typeof window.ImageMatcher);
-  
+  console.log('window.ImageUrlImporter:', typeof window.ImageUrlImporter);
+
   if (!window.ImageMatcher) {
     console.error('ImageMatcher module not loaded!');
+  }
+  if (!window.ImageUrlImporter) {
+    console.error('ImageUrlImporter module not loaded!');
   }
 }
 
@@ -51,9 +56,13 @@ async function initialize() {
   setupCSVUpload();
   setupImageUpload();
   setupFillButton();
+  setupFillNextButton();
+  setupClearAllItems();
   setupHideFriendsToggle();
   setupSettings();
-  
+
+  document.getElementById('field-mapping-list').addEventListener('change', updateProcessCsvButtonHint);
+
   // Try to load existing items
   await loadItems();
 }
@@ -167,12 +176,48 @@ async function handleCSVFileSelect(event) {
     // Show field mapping
     showFieldMapping(csvData.headers);
     document.getElementById('process-csv-button').style.display = 'block';
-    showStatus(`CSV file loaded: ${csvData.rows.length} rows found`, 'success');
+    updateProcessCsvButtonHint();
+    showStatus(
+      `CSV loaded: ${csvData.rows.length} rows. Scroll down in this popup: check field mapping (set Image URLs to your pics column if needed), then click Process CSV.`,
+      'success'
+    );
   } catch (error) {
     showStatus('Error parsing CSV: ' + error.message, 'error');
     console.error('CSV parse error:', error);
     csvData = null;
     document.getElementById('process-csv-button').style.display = 'none';
+    const ph = document.getElementById('process-csv-hint');
+    if (ph) ph.style.display = 'none';
+  }
+}
+
+function updateProcessCsvButtonHint() {
+  const btn = document.getElementById('process-csv-button');
+  const hint = document.getElementById('process-csv-hint');
+  const sel = document.querySelector('select[data-field="imageUrls"]');
+  if (!btn || btn.style.display === 'none') {
+    if (hint) hint.style.display = 'none';
+    return;
+  }
+  if (!sel) {
+    btn.textContent = 'Process CSV';
+    if (hint) hint.style.display = 'none';
+    return;
+  }
+  if (sel.value === '') {
+    btn.textContent = 'Process CSV';
+    if (hint) {
+      hint.style.display = 'block';
+      hint.textContent =
+        'Match columns above, then click Process CSV. For link-based images, choose the Image URLs column first—the button label will change when URLs will be fetched.';
+    }
+  } else {
+    btn.textContent = 'Process CSV & fetch images';
+    if (hint) {
+      hint.style.display = 'block';
+      hint.textContent =
+        'Comma-separated http(s) or Google Drive links in that column are downloaded into this extension when you click the button (no separate download step).';
+    }
   }
 }
 
@@ -180,9 +225,16 @@ function showFieldMapping(headers) {
   const mappingSection = document.getElementById('field-mapping-section');
   const mappingList = document.getElementById('field-mapping-list');
   
-  const { mapping, unmappedColumns } = window.FieldMapper.mapCSVHeaders(headers);
+  const { mapping, unmappedColumns, suggestedImageUrlsColumn } = window.FieldMapper.mapCSVHeaders(headers);
   
   mappingList.innerHTML = '';
+
+  const intro = document.createElement('div');
+  intro.className = 'field-mapping-intro';
+  intro.innerHTML =
+    '<strong>Next step:</strong> confirm each dropdown, then click <strong>Process CSV</strong> at the bottom. ' +
+    'There is no separate &quot;download images&quot; button—image links are fetched during that step if <strong>Image URLs</strong> is set.';
+  mappingList.appendChild(intro);
   
   // Show mapped fields
   const facebookFields = ['title', 'price', 'category', 'condition', 'description', 'size', 'materials'];
@@ -219,8 +271,107 @@ function showFieldMapping(headers) {
     row.appendChild(select);
     mappingList.appendChild(row);
   });
+
+  const imageUrlsField = 'imageUrls';
+  const imgRow = document.createElement('div');
+  imgRow.className = 'field-mapping-row field-mapping-row-image-urls';
+  const imgLabel = document.createElement('div');
+  imgLabel.className = 'field-mapping-label';
+  imgLabel.textContent = window.FieldMapper.getFieldDisplayName(imageUrlsField) + ':';
+  const imgSelect = document.createElement('select');
+  imgSelect.className = 'field-mapping-select';
+  imgSelect.dataset.field = imageUrlsField;
+  const imgEmpty = document.createElement('option');
+  imgEmpty.value = '';
+  imgEmpty.textContent = '(None)';
+  imgEmpty.selected = suggestedImageUrlsColumn === null;
+  imgSelect.appendChild(imgEmpty);
+  headers.forEach((header, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = header;
+    option.selected = suggestedImageUrlsColumn === index;
+    imgSelect.appendChild(option);
+  });
+  const imgHint = document.createElement('div');
+  imgHint.className = 'field-mapping-image-urls-hint';
+  imgHint.textContent =
+    'HTTPS links only: Google Drive or Docs share URLs, or direct *.googleusercontent.com image URLs. “Anyone with the link”. Downloads run when you process the CSV.';
+  imgRow.appendChild(imgLabel);
+  imgRow.appendChild(imgSelect);
+  imgRow.appendChild(imgHint);
+  mappingList.appendChild(imgRow);
   
   mappingSection.style.display = 'block';
+  updateProcessCsvButtonHint();
+}
+
+/**
+ * Fetches images from CSV URL column into IndexedDB; mutates items[].images.
+ * @returns {{ imported: number, errors: Array<{row:number,url:string,message:string}> }}
+ */
+async function importCsvUrlImages(processedItems, csvRows, fieldMapping, progressFill, startPercent, endPercent) {
+  const Imp = window.ImageUrlImporter;
+  if (!Imp) {
+    return { imported: 0, errors: [] };
+  }
+  const col = fieldMapping.imageUrls;
+  if (col === undefined || col === null) {
+    return { imported: 0, errors: [] };
+  }
+  const csvIndex = typeof col === 'number' ? col : parseInt(col, 10);
+  if (Number.isNaN(csvIndex)) {
+    return { imported: 0, errors: [] };
+  }
+
+  let totalFetches = 0;
+  for (const item of processedItems) {
+    const row = csvRows[item._rowIndex - 1];
+    if (!row) continue;
+    const urls = Imp.parseUrlsFromCell(row[csvIndex]).slice(0, Imp.MAX_IMAGES_PER_ITEM);
+    totalFetches += urls.length;
+  }
+
+  const errors = [];
+  let imported = 0;
+  let done = 0;
+
+  for (const item of processedItems) {
+    const row = csvRows[item._rowIndex - 1];
+    if (!row) continue;
+    const urls = Imp.parseUrlsFromCell(row[csvIndex]).slice(0, Imp.MAX_IMAGES_PER_ITEM);
+    if (urls.length === 0) continue;
+
+    item.images = [];
+    const titleDisplay = (item.title || `Row ${item._rowIndex}`).toString();
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        showStatus(
+          `Downloading images for "${titleDisplay}" — image ${i + 1} of ${urls.length} (${done + 1} of ${totalFetches} total)`,
+          'info'
+        );
+        const base = (item.title || `row${item._rowIndex}`).toString();
+        const file = await Imp.fetchUrlToFile(urls[i], base, i);
+        const imageKey = `${item.id}_url_${i}`;
+        await window.StorageManager.storeImage(imageKey, file, item.id);
+        item.images.push({ key: imageKey, filename: file.name, local: imageKey });
+        imported++;
+      } catch (e) {
+        errors.push({
+          row: item._rowIndex,
+          url: urls[i],
+          message: e.message || String(e)
+        });
+      }
+      done++;
+      if (totalFetches > 0 && progressFill) {
+        const p = startPercent + (done / totalFetches) * (endPercent - startPercent);
+        progressFill.style.width = `${Math.min(p, endPercent)}%`;
+      }
+    }
+  }
+
+  return { imported, errors };
 }
 
 async function processCSV() {
@@ -269,26 +420,36 @@ async function processCSV() {
     csvData.rows.forEach((row, index) => {
       try {
         const item = window.FieldMapper.applyMapping(row, fieldMapping);
-        
-        // Skip rows with no data at all
-        if (Object.keys(item).length === 0) {
+
+        const imgCol = fieldMapping.imageUrls;
+        const hasImageUrls =
+          window.ImageUrlImporter &&
+          imgCol !== undefined &&
+          imgCol !== null &&
+          !Number.isNaN(Number(imgCol)) &&
+          window.ImageUrlImporter.parseUrlsFromCell(row[imgCol]).length > 0;
+
+        if (Object.keys(item).length === 0 && !hasImageUrls) {
           return;
         }
-        
+        if (Object.keys(item).length === 0 && hasImageUrls) {
+          item.title = `Listing (row ${index + 1})`;
+        }
+
         // Generate ID if not provided
         if (!item.id) {
           item.id = generateId();
         }
-        
+
         // Store original row index for image matching (1-indexed)
         item._rowIndex = index + 1;
         item._identifier = row[identifierColumn] ? row[identifierColumn].toString().trim() : '';
-        
+
         // Initialize images array
         if (!item.images) {
           item.images = [];
         }
-        
+
         processedItems.push(item);
       } catch (error) {
         console.warn(`Error processing row ${index + 1}:`, error);
@@ -301,15 +462,43 @@ async function processCSV() {
     }
     
     progressFill.style.width = '70%';
-    
-    // Store items
+
+    const imageUrlsCol = fieldMapping.imageUrls;
+    if (
+      imageUrlsCol !== undefined &&
+      imageUrlsCol !== null &&
+      !Number.isNaN(parseInt(imageUrlsCol, 10))
+    ) {
+      showStatus('Fetching images from your Image URLs column…', 'info');
+    }
+
+    const urlResult = await importCsvUrlImages(
+      processedItems,
+      csvData.rows,
+      fieldMapping,
+      progressFill,
+      70,
+      96
+    );
+
     items = processedItems;
     await window.StorageManager.storeItems(items);
     await window.StorageManager.storeFieldMapping(fieldMapping);
-    
+
     progressFill.style.width = '100%';
-    
-    showStatus(`Successfully processed ${items.length} items from CSV`, 'success');
+
+    let statusMsg = `Successfully processed ${items.length} items from CSV`;
+    if (urlResult.imported > 0) {
+      statusMsg += `. Downloaded ${urlResult.imported} image(s) from URLs`;
+    }
+    if (urlResult.errors.length > 0) {
+      statusMsg +=
+        '. Download failed for these items—check that you set the folder access to anyone with the link.';
+      console.warn('CSV image URL import errors:', urlResult.errors);
+      showStatus(statusMsg, 'info');
+    } else {
+      showStatus(statusMsg, 'success');
+    }
     
     // Switch to items tab
     setTimeout(() => {
@@ -612,11 +801,172 @@ async function loadItems() {
   }
 }
 
+/** Unlisted items in display order (same ordering as the list: unlisted group first). */
+function getUnlistedIndicesInQueueOrder() {
+  if (!items.length) return [];
+  const sortedItems = [...items].sort((a, b) => {
+    const aListed = listedItems.has(a.id);
+    const bListed = listedItems.has(b.id);
+    if (aListed !== bListed) return aListed ? 1 : -1;
+    return 0;
+  });
+  return sortedItems
+    .filter((item) => !listedItems.has(item.id))
+    .map((item) => items.findIndex((o) => o.id === item.id))
+    .filter((idx) => idx >= 0);
+}
+
+function ensureDefaultItemSelection() {
+  const queue = getUnlistedIndicesInQueueOrder();
+  if (queue.length === 0) {
+    if (selectedItem && listedItems.has(selectedItem.id)) {
+      selectedItem = null;
+    }
+    return;
+  }
+  if (!selectedItem || listedItems.has(selectedItem.id)) {
+    selectItem(queue[0]);
+  }
+}
+
+function updateFillControlsState() {
+  const fill = document.getElementById('fill-button');
+  const fillNext = document.getElementById('fill-next-button');
+  if (!fill || !fillNext) return;
+  if (fillOperationInProgress) {
+    fill.disabled = true;
+    fillNext.disabled = true;
+    return;
+  }
+  const queue = getUnlistedIndicesInQueueOrder();
+  fillNext.disabled = queue.length === 0;
+  fill.disabled = !selectedItem || listedItems.has(selectedItem.id);
+}
+
+async function ensureMarketplaceContentScript(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: 'ping' });
+  } catch (e) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content.js']
+      });
+      await new Promise((r) => setTimeout(r, 300));
+    } catch (injectErr) {
+      throw new Error(
+        'Could not load on this page. Open Facebook Marketplace “Create new listing” and try again.'
+      );
+    }
+  }
+}
+
+async function buildFillPayloadForItem(item) {
+  const itemWithImages = { ...item };
+  if (itemWithImages.images && itemWithImages.images.length > 0) {
+    itemWithImages.images = await Promise.all(
+      itemWithImages.images.map(async (img) => window.StorageManager.getImage(img.key))
+    );
+    itemWithImages.images = itemWithImages.images.filter((f) => f !== null);
+  }
+  const imagesData = await Promise.all(
+    (itemWithImages.images || []).map(async (file) => {
+      const arrayBuffer = await file.arrayBuffer();
+      return {
+        arrayBuffer: Array.from(new Uint8Array(arrayBuffer)),
+        filename: file.name,
+        type: file.type,
+        lastModified: file.lastModified
+      };
+    })
+  );
+  return { ...itemWithImages, images: imagesData };
+}
+
+function sendFillFormMessage(tabId, payload) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(
+      tabId,
+      {
+        action: 'fillForm',
+        item: payload,
+        hideFromFriends: hideFromFriends
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(response);
+      }
+    );
+  });
+}
+
+async function onFillSuccess(filledItem) {
+  if (filledItem && filledItem.id) {
+    listedItems.add(filledItem.id);
+    await chrome.storage.local.set({ listedItems: Array.from(listedItems) });
+  }
+  renderItems();
+  const queue = getUnlistedIndicesInQueueOrder();
+  if (queue.length > 0) {
+    showStatus(
+      'Form filled. Next item is selected — use Fill form again or Fill next in queue.',
+      'success'
+    );
+  } else {
+    showStatus('Form filled. No more items in the queue.', 'success');
+  }
+  updateFillControlsState();
+}
+
+/**
+ * Fills the given item on the active tab’s Marketplace create page.
+ * @returns {Promise<boolean>} true if fill succeeded
+ */
+async function runFillPipelineForItem(item) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab.url || !tab.url.includes('facebook.com/marketplace/create')) {
+    showStatus('Please navigate to Facebook Marketplace create page first', 'error');
+    return false;
+  }
+
+  fillOperationInProgress = true;
+  updateFillControlsState();
+  showStatus('Filling form…', 'info');
+
+  try {
+    await ensureMarketplaceContentScript(tab.id);
+    const payload = await buildFillPayloadForItem(item);
+    const response = await sendFillFormMessage(tab.id, payload);
+    if (response && response.success) {
+      await onFillSuccess(item);
+      return true;
+    }
+    showStatus(response?.error || 'Failed to fill form', 'error');
+    return false;
+  } catch (error) {
+    console.error('Error filling form:', error);
+    showStatus('Error: ' + error.message, 'error');
+    return false;
+  } finally {
+    fillOperationInProgress = false;
+    updateFillControlsState();
+  }
+}
+
 function renderItems() {
   const itemList = document.getElementById('item-list');
-  
+  const clearAllBtn = document.getElementById('clear-all-items-button');
+  if (clearAllBtn) {
+    clearAllBtn.disabled = items.length === 0;
+  }
+
   if (items.length === 0) {
     itemList.innerHTML = '<div class="empty">No items loaded. Please upload a CSV file first.</div>';
+    selectedItem = null;
+    updateFillControlsState();
     return;
   }
   
@@ -661,28 +1011,57 @@ function renderItems() {
     
     itemList.appendChild(itemDiv);
   });
+
+  ensureDefaultItemSelection();
+  updateFillControlsState();
 }
 
 function selectItem(index) {
   const item = items[index];
-  
+
   if (listedItems.has(item.id)) {
     showStatus('This item has already been listed', 'error');
     return;
   }
-  
+
   selectedItem = item;
-  
+
   document.querySelectorAll('.item').forEach((itemEl) => {
-    const itemIndex = parseInt(itemEl.dataset.index);
+    const itemIndex = parseInt(itemEl.dataset.index, 10);
     if (itemIndex === index) {
       itemEl.classList.add('selected');
     } else {
       itemEl.classList.remove('selected');
     }
   });
-  
-  document.getElementById('fill-button').disabled = false;
+
+  updateFillControlsState();
+}
+
+function setupClearAllItems() {
+  const btn = document.getElementById('clear-all-items-button');
+  if (!btn || !window.StorageManager?.clearStoredItemsAndImages) return;
+
+  btn.addEventListener('click', async () => {
+    if (items.length === 0) return;
+    const ok = confirm(
+      'Remove all items and their stored images from this extension? This cannot be undone. Field mapping and settings are kept.'
+    );
+    if (!ok) return;
+
+    try {
+      await window.StorageManager.clearStoredItemsAndImages();
+      items = [];
+      selectedItem = null;
+      listedItems = new Set();
+      renderItems();
+      updateFillControlsState();
+      showStatus('All items cleared.', 'success');
+    } catch (e) {
+      showStatus('Could not clear items: ' + (e.message || String(e)), 'error');
+      console.error(e);
+    }
+  });
 }
 
 function setupFillButton() {
@@ -691,97 +1070,30 @@ function setupFillButton() {
       showStatus('Please select an item first', 'error');
       return;
     }
-    
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
-      if (!tab.url || !tab.url.includes('facebook.com/marketplace/create')) {
-        showStatus('Please navigate to Facebook Marketplace create page first', 'error');
-        return;
-      }
-      
-      showStatus('Filling form...', 'info');
-      document.getElementById('fill-button').disabled = true;
-      
-      // Inject content script dynamically (Privacy First method - no host permissions needed)
-      try {
-        // First, try to ping to see if script is already loaded
-        await chrome.tabs.sendMessage(tab.id, { action: 'ping' });
-      } catch (e) {
-        // Script not loaded, inject it now
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content.js']
-          });
-          // Wait a bit for script to initialize
-          await new Promise(resolve => setTimeout(resolve, 300));
-        } catch (injectError) {
-          showStatus('Failed to inject script. Please make sure you are on the Facebook Marketplace create page.', 'error');
-          document.getElementById('fill-button').disabled = false;
-          return;
-        }
-      }
-      
-      // Get images from storage - retrieve as File objects
-      const itemWithImages = { ...selectedItem };
-      if (itemWithImages.images && itemWithImages.images.length > 0) {
-        itemWithImages.images = await Promise.all(
-          itemWithImages.images.map(async (img) => {
-            const file = await window.StorageManager.getImage(img.key);
-            return file; // Return File object directly
-          })
-        );
-        // Filter out nulls
-        itemWithImages.images = itemWithImages.images.filter(f => f !== null);
-      }
-      
-      // Send message with File objects - but File objects can't be sent via chrome.runtime.sendMessage
-      // So we need to convert to ArrayBuffer and reconstruct on the other side
-      const imagesData = await Promise.all(
-        (itemWithImages.images || []).map(async (file) => {
-          const arrayBuffer = await file.arrayBuffer();
-          return {
-            arrayBuffer: Array.from(new Uint8Array(arrayBuffer)), // Convert to plain array
-            filename: file.name,
-            type: file.type,
-            lastModified: file.lastModified
-          };
-        })
-      );
-      
-      chrome.tabs.sendMessage(tab.id, {
-        action: 'fillForm',
-        item: { ...itemWithImages, images: imagesData },
-        hideFromFriends: hideFromFriends
-      }, async (response) => {
-        if (chrome.runtime.lastError) {
-          showStatus('Error: ' + chrome.runtime.lastError.message, 'error');
-          document.getElementById('fill-button').disabled = false;
-          return;
-        }
-        
-        if (response && response.success) {
-          showStatus('Form filled successfully!', 'success');
-          
-          if (selectedItem && selectedItem.id) {
-            listedItems.add(selectedItem.id);
-            await chrome.storage.local.set({ listedItems: Array.from(listedItems) });
-            renderItems();
-            selectedItem = null;
-            document.getElementById('fill-button').disabled = true;
-          }
-        } else {
-          showStatus(response?.error || 'Failed to fill form', 'error');
-        }
-        
-        document.getElementById('fill-button').disabled = false;
-      });
-    } catch (error) {
-      console.error('Error filling form:', error);
-      showStatus('Error: ' + error.message, 'error');
-      document.getElementById('fill-button').disabled = false;
+    if (listedItems.has(selectedItem.id)) {
+      showStatus('This item is already marked as listed.', 'error');
+      return;
     }
+
+    await runFillPipelineForItem(selectedItem);
+  });
+}
+
+function setupFillNextButton() {
+  const btn = document.getElementById('fill-next-button');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const queue = getUnlistedIndicesInQueueOrder();
+    if (queue.length === 0) {
+      showStatus('No unlisted items left in the queue.', 'info');
+      return;
+    }
+
+    const nextIndex = queue[0];
+    const item = items[nextIndex];
+    selectItem(nextIndex);
+    await runFillPipelineForItem(item);
   });
 }
 

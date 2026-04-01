@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Marketplace Auto-Fill</title>
+  <link rel="icon" href="icons/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48x48.png">
   <style>
     * {
       margin: 0;
@@ -276,6 +280,56 @@
       color: #999;
     }
 
+    .items-actions-top {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      padding-bottom: 0.75rem;
+      margin: -0.25rem 0 0.75rem;
+      padding-top: 0.25rem;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .items-actions-top .button {
+      width: 100%;
+    }
+
+    .items-actions-top .button + .button {
+      margin-top: 0.5rem;
+    }
+
+    .items-fill-hint {
+      font-size: 0.6875rem;
+      color: #64748b;
+      line-height: 1.35;
+      margin-top: 0.5rem;
+    }
+
+    .items-marketplace-link {
+      display: inline-block;
+      margin-top: 0.625rem;
+      font-size: 0.75rem;
+      color: #1877f2;
+      text-decoration: none;
+    }
+
+    .items-marketplace-link:hover {
+      text-decoration: underline;
+    }
+
+    .items-footer {
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #e5e5e5;
+    }
+
+    .items-footer .button {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+    }
+
     .options {
       background: white;
       border: 1px solid #ddd;
@@ -371,6 +425,43 @@
       border-radius: 0.25rem;
     }
 
+    .field-mapping-intro {
+      font-size: 0.75rem;
+      color: #444;
+      line-height: 1.4;
+      margin-bottom: 0.75rem;
+      padding: 0.5rem 0.625rem;
+      background: #e7f3ff;
+      border-radius: 0.375rem;
+      border: 1px solid #b3d7ff;
+    }
+
+    .field-mapping-row-image-urls {
+      flex-wrap: wrap;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+    }
+
+    .field-mapping-row-image-urls .field-mapping-label {
+      flex: 1;
+      color: #1877f2;
+    }
+
+    .field-mapping-row-image-urls .field-mapping-select {
+      flex: 2;
+    }
+
+    .field-mapping-image-urls-hint {
+      flex: 1 1 100%;
+      font-size: 0.6875rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+      line-height: 1.35;
+    }
+
     .settings-section {
       background: white;
       border: 1px solid #ddd;
@@ -434,7 +525,8 @@
         </div>
         <div class="help-text">
           CSV should contain columns: Title, Price, Category, Condition, Description, etc.<br>
-          Values should match Facebook's exact field names.
+          Values should match Facebook's exact field names.<br>
+          Optional: map <strong>Image URLs</strong> to a column of comma-separated image links (http/https or Google Drive share links; Drive files must be shared as &quot;Anyone with the link&quot;).
         </div>
         <div id="csv-file-list" class="file-list" style="display: none;"></div>
         <div id="csv-progress" style="display: none;">
@@ -449,7 +541,8 @@
         <div id="field-mapping-list"></div>
       </div>
       
-      <button id="process-csv-button" class="button" style="display: none;">Process CSV</button>
+      <button id="process-csv-button" class="button" style="display: none;" type="button">Process CSV</button>
+      <div id="process-csv-hint" class="help-text" style="display: none; margin-top: 0.5rem;"></div>
     </div>
 
     <!-- Image Upload Tab -->
@@ -457,7 +550,8 @@
       <div class="upload-section" id="image-upload-section">
         <div>🖼️ Upload Images</div>
         <div class="help-text">
-          Images should be named: Row{number}_{identifier}_{number}.{ext}<br>
+          Or use the CSV tab: map <strong>Image URLs</strong> to a column of links—images are fetched when you click Process CSV.<br><br>
+          File upload: name images Row{number}_{identifier}_{number}.{ext}<br>
           Example: Row1_Item Name_1.jpg
         </div>
         <div class="file-input-wrapper">
@@ -476,6 +570,19 @@
 
     <!-- Items Tab -->
     <div id="tab-items" class="tab-content">
+      <div class="items-actions-top">
+        <button id="fill-button" class="button" type="button" disabled>Fill form</button>
+        <button id="fill-next-button" class="button button-secondary" type="button" disabled>Fill next in queue</button>
+        <div class="items-fill-hint" id="items-fill-hint">
+          Select an item in the list, then use <strong>Fill form</strong>. After a successful fill, the next listing is selected automatically. Use <strong>Fill next in queue</strong> to fill the next unlisted item in one step.
+        </div>
+        <a
+          href="https://www.facebook.com/marketplace/create/item"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="items-marketplace-link"
+        >Open Marketplace new listing page</a>
+      </div>
       <div id="item-list" class="item-list">
         <div class="empty">No items loaded. Please upload a CSV file first.</div>
       </div>
@@ -489,8 +596,10 @@
           <div id="hide-friends-toggle" class="toggle-switch active" role="button" tabindex="0" aria-label="Hide from friends" aria-checked="true"></div>
         </div>
       </div>
-      
-      <button id="fill-button" class="button" disabled>Fill Form</button>
+
+      <div class="items-footer">
+        <button type="button" id="clear-all-items-button" class="button button-secondary" disabled>Clear all items</button>
+      </div>
     </div>
 
     <!-- Settings Tab -->
@@ -510,6 +619,7 @@
   <script src="storageManager.js"></script>
   <script src="csvParser.js"></script>
   <script src="fieldMapper.js"></script>
+  <script src="imageUrlImporter.js"></script>
   <script src="imageMatcher.js"></script>
   <script src="popup.js"></script>
 </body>

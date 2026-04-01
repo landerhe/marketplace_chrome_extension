@@ -159,6 +159,15 @@ async function clearAllImages() {
   });
 }
 
+// Remove all items, listed-item flags, and images (full reset of inventory in the extension)
+async function clearStoredItemsAndImages() {
+  await clearAllImages();
+  return chrome.storage.local.set({
+    items: [],
+    listedItems: []
+  });
+}
+
 // Store items data in chrome.storage.local
 async function storeItems(items) {
   return chrome.storage.local.set({ items: items });
@@ -211,6 +220,7 @@ if (typeof window !== 'undefined') {
     getItemImages,
     deleteImage,
     clearAllImages,
+    clearStoredItemsAndImages,
     storeItems,
     getItems,
     storeFieldMapping,
