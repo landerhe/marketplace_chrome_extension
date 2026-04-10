@@ -586,26 +586,35 @@ async function fillCondition(condition) {
   await selectDropdownOption('condition', condition);
 }
 
+const DEFAULT_DESCRIPTION_PART_ORDER = [
+  'title',
+  'size',
+  'materials',
+  'condition',
+  'csvDescription',
+  'custom'
+];
+
 async function fillDescription(item) {
-  const parts = [];
-  
-  if (item.title) parts.push(item.title);
-  if (item.size) parts.push(`Size: ${item.size}`);
-  if (item.materials) parts.push(`Materials: ${item.materials}`);
-  if (item.condition) parts.push(`Condition: ${item.condition}`);
-  
-  // Add custom description text from settings if set
+  let order;
+  let customDescription = '';
   try {
     const settings = await chrome.storage.local.get('extensionSettings');
-    const customDescription = settings.extensionSettings?.customDescription || '';
-    if (customDescription && customDescription.trim()) {
-      parts.push(customDescription.trim());
-    }
+    const ext = settings.extensionSettings || {};
+    customDescription = ext.customDescription || '';
+    order = Array.isArray(ext.descriptionPartOrder) ? ext.descriptionPartOrder : null;
   } catch (error) {
-    console.warn('Error loading custom description:', error);
+    console.warn('Error loading description settings:', error);
+    order = null;
   }
-  
-  const description = parts.join('\n\n');
+  if (order === null || order === undefined) {
+    order = DEFAULT_DESCRIPTION_PART_ORDER;
+  }
+
+  const DA = window.DescriptionAssembly;
+  const description = DA
+    ? DA.buildMarketplaceDescription(order, item, customDescription)
+    : '';
   if (!description) return;
   
   const field = findDescriptionField();

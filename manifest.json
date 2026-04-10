@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AutoList for Facebook Marketplace - Bulk Lister & Automation",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Bulk upload and fill Facebook Marketplace listings. Auto-fill titles, prices, descriptions, and IMAGEs.",
   "permissions": [
     "activeTab",
@@ -20,6 +20,7 @@
   },
   "host_permissions": [
     "https://drive.google.com/*",
+    "https://drive.usercontent.google.com/*",
     "https://docs.google.com/*",
     "https://*.googleusercontent.com/*"
   ],

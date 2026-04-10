@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Import &amp; mapping — Marketplace Auto-Fill</title>
+  <link rel="icon" href="icons/favicon.ico" sizes="any" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+    .workshop-header {
+      background: #1877f2;
+      color: #fff;
+      padding: 1rem 1.5rem;
+      font-weight: 600;
+      font-size: 1.125rem;
+    }
+    .workshop-header-sub {
+      font-weight: 400;
+      font-size: 0.8125rem;
+      opacity: 0.95;
+      margin-top: 0.25rem;
+    }
+    .workshop-main {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
+    }
+    #status.status {
+      display: none;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+    #status.status.error { background: #fee; color: #c33; border: 1px solid #fcc; }
+    #status.status.success { background: #efe; color: #3c3; border: 1px solid #cfc; }
+    #status.status.info { background: #eef; color: #33c; border: 1px solid #ccf; }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: #1877f2;
+    }
+    .upload-section {
+      border: 2px dashed #ccc;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-section.has-files { border-style: solid; border-color: #1877f2; }
+    .upload-section.drag-over { border-color: #1877f2; background: #e7f3ff; }
+    .file-input-wrapper { position: relative; display: inline-block; margin-top: 0.5rem; }
+    .file-input-wrapper input[type="file"] {
+      position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+    .file-input-button {
+      padding: 0.5rem 1rem;
+      background: #1877f2;
+      color: #fff;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      display: inline-block;
+      font-size: 0.875rem;
+    }
+    .help-text {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 0.75rem;
+      text-align: left;
+    }
+    .file-list { margin-top: 1rem; text-align: left; }
+    .file-item {
+      padding: 0.5rem;
+      background: #f5f5f5;
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .csv-progress-below-button {
+      max-width: 28rem;
+      margin-top: 0.75rem;
+    }
+
+    .csv-process-result {
+      display: none;
+      max-width: 40rem;
+      margin-top: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+
+    .csv-process-result--success {
+      background: #efe;
+      color: #1a5c1a;
+      border: 1px solid #cfc;
+    }
+
+    .csv-process-result--error {
+      background: #fee;
+      color: #a33;
+      border: 1px solid #fcc;
+    }
+
+    .csv-process-result--info {
+      background: #eef;
+      color: #224;
+      border: 1px solid #ccf;
+    }
+
+    #image-progress .progress-bar {
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 0.5rem;
+      background: #e0e0e0;
+      border-radius: 0.25rem;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #1877f2;
+      transition: width 0.3s;
+    }
+    .field-mapping { font-size: 0.875rem; }
+    .field-mapping-intro {
+      font-size: 0.75rem;
+      color: #444;
+      line-height: 1.4;
+      margin-bottom: 0.75rem;
+      padding: 0.5rem 0.625rem;
+      background: #e7f3ff;
+      border-radius: 0.375rem;
+      border: 1px solid #b3d7ff;
+    }
+    .field-mapping-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .field-mapping-label { flex: 1; font-weight: 600; min-width: 6rem; }
+    .field-mapping-select {
+      flex: 2;
+      min-width: 12rem;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+    }
+    .field-mapping-row-image-urls {
+      flex-wrap: wrap;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+    }
+    .field-mapping-row-image-urls .field-mapping-label { color: #1877f2; }
+    .field-mapping-image-urls-hint {
+      flex: 1 1 100%;
+      font-size: 0.6875rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+      line-height: 1.35;
+    }
+    .title-mode-options label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .title-mode-options input { margin-right: 0.5rem; }
+    #title-concat-panel { margin-top: 1rem; }
+    .concat-part-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .concat-sep-input {
+      width: 5rem;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      font-size: 0.8125rem;
+    }
+    .concat-mini-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      border-radius: 0.25rem;
+      cursor: pointer;
+    }
+    .concat-mini-btn:hover { background: #eaeaea; }
+    .preview-box {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+    .preview-box .label { font-size: 0.6875rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .description-preview-pre {
+      margin: 0;
+      font-family: inherit;
+      font-size: 0.875rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #1e293b;
+    }
+    .button {
+      display: inline-block;
+      width: 100%;
+      max-width: 28rem;
+      padding: 0.75rem 1rem;
+      background: #1877f2;
+      color: #fff;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .button:hover:not(:disabled) { background: #166fe5; }
+    .button:disabled { background: #ccc; cursor: not-allowed; }
+    .button-row { margin-top: 1rem; }
+    .workshop-footer-note {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 1.5rem;
+    }
+    .workshop-footer-note a { color: #1877f2; }
+
+    .desc-part-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem 0.625rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.375rem;
+    }
+    .desc-part-label {
+      flex: 1;
+      font-size: 0.875rem;
+      min-width: 10rem;
+    }
+    .desc-add-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+    .settings-textarea {
+      width: 100%;
+      max-width: 40rem;
+      min-height: 5rem;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .settings-textarea:focus {
+      outline: none;
+      border-color: #1877f2;
+    }
+    .button-secondary-workshop {
+      background: #e0e0e0;
+      color: #333;
+      max-width: 40rem;
+    }
+    .button-secondary-workshop:hover:not(:disabled) {
+      background: #d5d5d5;
+    }
+  </style>
+</head>
+<body>
+  <header class="workshop-header">
+    Import &amp; mapping
+    <div class="workshop-header-sub">This is where you upload your CSV and images, map columns to Facebook fields, and set how titles are built. When you are done, use the extension popup → Items to fill each listing on Facebook.</div>
+  </header>
+  <main class="workshop-main">
+    <div id="status" class="status"></div>
+
+    <section class="card" id="csv-card">
+      <h2>1. CSV file</h2>
+      <div class="upload-section" id="csv-upload-section">
+        <div>Upload CSV</div>
+        <div class="file-input-wrapper">
+          <input type="file" id="csv-file-input" accept=".csv,.txt" />
+          <label for="csv-file-input" class="file-input-button">Choose CSV file</label>
+        </div>
+        <div class="help-text">
+          First row must be headers. Map <strong>Image URLs</strong> if you use link-based images; URLs are fetched when you process the CSV.
+        </div>
+        <div id="csv-file-list" class="file-list" style="display: none;"></div>
+      </div>
+    </section>
+
+    <section class="card" id="mapping-card" style="display: none;">
+      <h2>2. Field mapping</h2>
+      <div id="field-mapping-section" class="field-mapping">
+        <div id="field-mapping-list"></div>
+      </div>
+
+      <h2 style="margin-top: 1.25rem;">Title</h2>
+      <div class="title-mode-options">
+        <label>
+          <input type="radio" name="title-mode" value="single" checked />
+          Single column — use the <strong>Title</strong> row below
+        </label>
+        <label>
+          <input type="radio" name="title-mode" value="concat" />
+          Build title from multiple columns (with separators)
+        </label>
+      </div>
+      <div id="title-concat-panel" style="display: none;">
+        <p class="help-text" style="margin-bottom: 0.5rem;">
+          Empty cells are skipped. Separators apply between column positions (skipped columns collapse gaps).
+        </p>
+        <div id="concat-rows"></div>
+        <button type="button" class="concat-mini-btn" id="concat-add-row">+ Add column</button>
+        <div id="title-preview" class="preview-box" style="display: none;">
+          <div class="label">Preview (first data row)</div>
+          <div id="title-preview-text"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="description-card">
+      <h2>3. Facebook listing description</h2>
+      <p class="help-text" style="margin-bottom: 0.75rem;">
+        When you use <strong>Fill form</strong> in the extension popup, the Marketplace description is built from these blocks in order. Empty blocks are skipped. Blocks are separated by a blank line.
+      </p>
+      <div id="description-parts-list"></div>
+      <div class="desc-add-row">
+        <select id="description-part-add-select" class="field-mapping-select" aria-label="Add description block"></select>
+        <button type="button" class="concat-mini-btn" id="description-part-add-btn">Add block</button>
+      </div>
+      <div id="description-preview" class="preview-box" style="display: none; margin-top: 1rem;">
+        <div class="label">Preview (first data row)</div>
+        <pre id="description-preview-text" class="description-preview-pre"></pre>
+      </div>
+      <h3 style="margin-top: 1.25rem; margin-bottom: 0.5rem; font-size: 0.9375rem; color: #1877f2;">Description footnote</h3>
+      <p class="help-text" style="margin-bottom: 0.5rem;">
+        You can add a footnote to your listings, for example, you can have your description always end up with "Price is negotiable, PM me for details." 
+      </p>
+      <textarea
+        id="custom-description-textarea"
+        class="settings-textarea"
+        placeholder="e.g. More items in my profile — message for bundle pricing"
+        aria-label="Description footnote"
+      ></textarea>
+      <div class="button-row" style="margin-top: 0.75rem;">
+        <button type="button" class="button button-secondary-workshop" id="save-description-settings-button">Save description layout &amp; footnote</button>
+      </div>
+    </section>
+
+    <section class="card" id="process-csv-card" style="display: none;">
+      <h2>4. Process CSV</h2>
+      <p class="help-text" style="margin-bottom: 0.75rem;">
+        Run this after mapping, title options, and description layout look right. Items are saved to the extension; mapped <strong>Image URLs</strong> are downloaded here too.
+      </p>
+      <div id="process-csv-hint" class="help-text" style="display: none; margin-bottom: 0.75rem;"></div>
+      <div class="button-row">
+        <button type="button" class="button" id="process-csv-button">Process CSV</button>
+      </div>
+      <div id="csv-progress" class="csv-progress-below-button" style="display: none;">
+        <div class="progress-bar">
+          <div class="progress-fill" id="csv-progress-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+      <div id="csv-process-result" class="csv-process-result" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card" id="images-card">
+      <h2>5. Images (optional)</h2>
+      <p class="help-text" style="margin-bottom: 0.75rem;">
+        Or rely on <strong>Image URLs</strong> in the CSV (downloaded in step 4). File names: <code>Row{number}_{identifier}_{number}.ext</code>
+      </p>
+      <div class="upload-section" id="image-upload-section">
+        <div class="file-input-wrapper">
+          <input type="file" id="image-file-input" accept="image/*" multiple />
+          <label for="image-file-input" class="file-input-button">Choose images</label>
+        </div>
+        <div id="image-file-list" class="file-list"></div>
+        <div id="image-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="image-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button type="button" class="button" id="process-images-button" style="display: none;">Match images to items</button>
+      </div>
+    </section>
+
+    <p class="workshop-footer-note">
+      Set description blocks in section 3, then use section 4 to process the CSV. When done, open the extension popup → <strong>Items</strong> to fill each listing.
+    </p>
+  </main>
+
+  <script src="utils.js"></script>
+  <script src="storageManager.js"></script>
+  <script src="csvParser.js"></script>
+  <script src="fieldMapper.js"></script>
+  <script src="csvProcessing.js"></script>
+  <script src="descriptionAssembly.js"></script>
+  <script src="imageUrlImporter.js"></script>
+  <script src="imageMatcher.js"></script>
+  <script src="workshop.js"></script>
+</body>
+</html>

@@ -23,12 +23,17 @@ function isGoogleUsercontentHost(hostname) {
   return h === 'googleusercontent.com' || h.endsWith('.googleusercontent.com');
 }
 
+/** Actual file bytes are often served here after redirects from drive.google.com/uc?... */
+function isDriveUsercontentHost(hostname) {
+  return String(hostname).toLowerCase() === 'drive.usercontent.google.com';
+}
+
 function upgradeHttpToHttpsForGoogleHosts(urlString) {
   try {
     const u = new URL(urlString.trim());
     if (u.protocol !== 'http:') return urlString.trim();
     const h = u.hostname.toLowerCase();
-    if (h === 'drive.google.com' || h === 'docs.google.com' || isGoogleUsercontentHost(h)) {
+    if (h === 'drive.google.com' || h === 'docs.google.com' || isDriveUsercontentHost(h) || isGoogleUsercontentHost(h)) {
       u.protocol = 'https:';
       return u.href;
     }
@@ -48,7 +53,7 @@ function isAllowedRemoteImageUrl(urlString) {
   }
   if (u.protocol !== 'https:') return false;
   const h = u.hostname.toLowerCase();
-  return h === 'drive.google.com' || h === 'docs.google.com' || isGoogleUsercontentHost(h);
+  return h === 'drive.google.com' || h === 'docs.google.com' || isDriveUsercontentHost(h) || isGoogleUsercontentHost(h);
 }
 
 function isGoogleDriveUrl(urlString) {

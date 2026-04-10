@@ -499,6 +499,33 @@
       outline: none;
       border-color: #1877f2;
     }
+
+    .workshop-banner {
+      background: #e7f3ff;
+      border: 1px solid #b3d7ff;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      color: #333;
+      line-height: 1.45;
+    }
+
+    .workshop-banner-title {
+      font-weight: 700;
+      font-size: 0.9375rem;
+      margin-bottom: 0.375rem;
+    }
+
+    .workshop-banner-body {
+      font-size: 0.75rem;
+      color: #444;
+      margin: 0;
+    }
+
+    .workshop-banner .button {
+      margin-top: 0.75rem;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -508,68 +535,14 @@
   <div class="container">
     <div id="status" class="status" style="display: none;"></div>
     
-    <div class="tabs">
-      <button class="tab active" data-tab="csv">CSV</button>
-      <button class="tab" data-tab="images">Images</button>
-      <button class="tab" data-tab="items">Items</button>
-      <button class="tab" data-tab="settings">Settings</button>
-    </div>
-
-    <!-- CSV Upload Tab -->
-    <div id="tab-csv" class="tab-content active">
-      <div class="upload-section" id="csv-upload-section">
-        <div>📄 Upload CSV File</div>
-        <div class="file-input-wrapper">
-          <input type="file" id="csv-file-input" accept=".csv,.txt" />
-          <label for="csv-file-input" class="file-input-button">Choose CSV File</label>
-        </div>
-        <div class="help-text">
-          CSV should contain columns: Title, Price, Category, Condition, Description, etc.<br>
-          Values should match Facebook's exact field names.<br>
-          Optional: map <strong>Image URLs</strong> to a column of comma-separated image links (http/https or Google Drive share links; Drive files must be shared as &quot;Anyone with the link&quot;).
-        </div>
-        <div id="csv-file-list" class="file-list" style="display: none;"></div>
-        <div id="csv-progress" style="display: none;">
-          <div class="progress-bar">
-            <div class="progress-fill" id="csv-progress-fill" style="width: 0%;"></div>
-          </div>
-        </div>
+    <div id="popup-main">
+      <div class="workshop-banner">
+        <div class="workshop-banner-title">Start here — upload your listing data</div>
+        <p class="workshop-banner-body">
+          Your CSV file and optional image files are added on the next screen (it opens in a new tab so there is enough space to map columns and build titles).
+        </p>
+        <button type="button" class="button" id="open-workshop-button">Upload CSV &amp; images</button>
       </div>
-      
-      <div id="field-mapping-section" class="field-mapping" style="display: none;">
-        <div style="font-weight: 600; margin-bottom: 0.5rem;">Field Mapping</div>
-        <div id="field-mapping-list"></div>
-      </div>
-      
-      <button id="process-csv-button" class="button" style="display: none;" type="button">Process CSV</button>
-      <div id="process-csv-hint" class="help-text" style="display: none; margin-top: 0.5rem;"></div>
-    </div>
-
-    <!-- Image Upload Tab -->
-    <div id="tab-images" class="tab-content">
-      <div class="upload-section" id="image-upload-section">
-        <div>🖼️ Upload Images</div>
-        <div class="help-text">
-          Or use the CSV tab: map <strong>Image URLs</strong> to a column of links—images are fetched when you click Process CSV.<br><br>
-          File upload: name images Row{number}_{identifier}_{number}.{ext}<br>
-          Example: Row1_Item Name_1.jpg
-        </div>
-        <div class="file-input-wrapper">
-          <input type="file" id="image-file-input" accept="image/*" multiple />
-          <label for="image-file-input" class="file-input-button">Choose Images</label>
-        </div>
-        <div id="image-file-list" class="file-list"></div>
-        <div id="image-progress" style="display: none;">
-          <div class="progress-bar">
-            <div class="progress-fill" id="image-progress-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-      </div>
-      <button id="process-images-button" class="button" style="display: none;">Match Images to Items</button>
-    </div>
-
-    <!-- Items Tab -->
-    <div id="tab-items" class="tab-content">
       <div class="items-actions-top">
         <button id="fill-button" class="button" type="button" disabled>Fill form</button>
         <button id="fill-next-button" class="button button-secondary" type="button" disabled>Fill next in queue</button>
@@ -584,7 +557,7 @@
         >Open Marketplace new listing page</a>
       </div>
       <div id="item-list" class="item-list">
-        <div class="empty">No items loaded. Please upload a CSV file first.</div>
+        <div class="empty">No listings yet. Use <strong>Upload CSV &amp; images</strong> above.</div>
       </div>
       
       <div class="options">
@@ -601,26 +574,10 @@
         <button type="button" id="clear-all-items-button" class="button button-secondary" disabled>Clear all items</button>
       </div>
     </div>
-
-    <!-- Settings Tab -->
-    <div id="tab-settings" class="tab-content">
-      <div class="settings-section">
-        <div class="settings-label">Custom Description Text</div>
-        <div class="settings-description">
-          Optional text to append to each listing's description. Leave blank to not add any custom text.
-        </div>
-        <textarea id="custom-description-textarea" class="settings-textarea" placeholder="Enter custom description text (e.g., 'There are many items that I am selling in the QR provided')"></textarea>
-      </div>
-      <button id="save-settings-button" class="button">Save Settings</button>
-    </div>
   </div>
 
   <script src="utils.js"></script>
   <script src="storageManager.js"></script>
-  <script src="csvParser.js"></script>
-  <script src="fieldMapper.js"></script>
-  <script src="imageUrlImporter.js"></script>
-  <script src="imageMatcher.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

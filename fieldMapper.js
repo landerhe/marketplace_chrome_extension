@@ -1,14 +1,39 @@
 // Field mapping utility - maps CSV column names to Facebook field names
 
 const FACEBOOK_FIELDS = {
-  title: ['title', 'name', 'brand', 'item name', 'product name', 'item'],
-  price: ['price', 'cost', 'amount', 'value'],
+  title: ['title', 'name', 'brand', 'item name', 'product name', 'item', 'title of the item'],
+  price: ['price', 'cost', 'amount', 'value', 'price (numbers only)'],
   category: ['category', 'type', 'item category', 'product category'],
-  condition: ['condition', 'used condition', 'item condition', 'quality'],
-  description: ['description', 'desc', 'details', 'item description'],
+  condition: [
+    'condition',
+    'used condition',
+    'item condition',
+    'quality',
+    'condition of the item'
+  ],
+  description: [
+    'description',
+    'desc',
+    'details',
+    'item description',
+    'description (include relevant details, dimensions, and reasons for selling)'
+  ],
   size: ['size'],
   materials: ['materials', 'material', 'fabric', 'composition']
 };
+
+// Long Google Form–style headers: map by normalized prefix when not an exact alias match
+const FIELD_HEADER_PREFIXES = [
+  ['title', (n) => n.startsWith('title of the item')],
+  ['price', (n) => n.startsWith('price (numbers only)') || n.startsWith('price(numbers only)')],
+  ['condition', (n) => n.startsWith('condition of the item')],
+  [
+    'description',
+    (n) =>
+      n.startsWith('description (include') ||
+      (n.startsWith('description') && n.length > 'description'.length)
+  ]
+];
 
 // CSV columns that hold comma-separated image URLs (not sent to Facebook as text)
 const IMAGE_URL_COLUMN_ALIASES = [
@@ -25,7 +50,12 @@ const IMAGE_URL_COLUMN_ALIASES = [
   '照片',
   '相片',
   '图链',
-  '圖片'
+  '圖片',
+  // "New Product Listing Form" sample CSV — Upload Photos / Videos (Max 5) of the Item
+  'upload photos / videos',
+  'upload photos',
+  'upload videos',
+  'max 5) of the item'
 ];
 
 const INTERNAL_MAPPING_KEYS = new Set(['imageUrls']);
@@ -50,7 +80,13 @@ function detectField(csvColumnName) {
       return fbField;
     }
   }
-  
+
+  for (const [fbField, matches] of FIELD_HEADER_PREFIXES) {
+    if (matches(normalized)) {
+      return fbField;
+    }
+  }
+
   return null;
 }
 

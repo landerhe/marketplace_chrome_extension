@@ -190,26 +190,40 @@ async function getFieldMapping() {
   return result.fieldMapping || null;
 }
 
-// Store CSV settings (identifier column, etc.)
-async function storeCSVSettings(settings) {
-  return chrome.storage.local.set({ csvSettings: settings });
+const DEFAULT_TITLE_SETTINGS = {
+  mode: 'single',
+  concatColumns: [],
+  concatSeparators: []
+};
+
+async function storeTitleSettings(settings) {
+  return chrome.storage.local.set({ titleSettings: settings });
 }
 
-// Get CSV settings
-async function getCSVSettings() {
-  const result = await chrome.storage.local.get('csvSettings');
-  return result.csvSettings || { identifierColumn: 0 }; // Default to Title column (index 0)
+async function getTitleSettings() {
+  const result = await chrome.storage.local.get('titleSettings');
+  return { ...DEFAULT_TITLE_SETTINGS, ...(result.titleSettings || {}) };
 }
 
-// Store extension settings (custom description, etc.)
+// Store extension settings (description footnote = uniform text, block order, etc.)
 async function storeExtensionSettings(settings) {
   return chrome.storage.local.set({ extensionSettings: settings });
 }
 
-// Get extension settings
+const DEFAULT_EXTENSION_SETTINGS = {
+  customDescription: '',
+  descriptionPartOrder: ['title', 'size', 'materials', 'condition', 'csvDescription', 'custom']
+};
+
+// Get extension settings (descriptionPartOrder = blocks for Marketplace description, in order)
 async function getExtensionSettings() {
   const result = await chrome.storage.local.get('extensionSettings');
-  return result.extensionSettings || { customDescription: '' }; // Default to blank
+  const raw = result.extensionSettings || {};
+  const merged = { ...DEFAULT_EXTENSION_SETTINGS, ...raw };
+  if (!Array.isArray(raw.descriptionPartOrder)) {
+    merged.descriptionPartOrder = [...DEFAULT_EXTENSION_SETTINGS.descriptionPartOrder];
+  }
+  return merged;
 }
 
 // Export functions to window for use in other scripts
@@ -225,8 +239,8 @@ if (typeof window !== 'undefined') {
     getItems,
     storeFieldMapping,
     getFieldMapping,
-    storeCSVSettings,
-    getCSVSettings,
+    storeTitleSettings,
+    getTitleSettings,
     storeExtensionSettings,
     getExtensionSettings
   };
