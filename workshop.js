@@ -15,6 +15,78 @@ const DESCRIPTION_BLOCKS = [
 
 const DESCRIPTION_BLOCK_IDS = new Set(DESCRIPTION_BLOCKS.map((b) => b.id));
 
+/** Google Form export column titles — matches fieldMapper auto-detect. */
+const LISTING_TEMPLATE_HEADERS = [
+  'Timestamp',
+  'Upload Photos / Videos (Max 5) of the Item',
+  'Title of the Item',
+  'Price (Numbers Only)',
+  'Category',
+  'Condition of the Item',
+  'Description (Include relevant details, dimensions, and reasons for selling)',
+  'Availability',
+  'Product Tags (Optional, limit 20 tags, separated by commas)',
+  'Local Transaction Options',
+  'Listing Management Settings',
+  'Size',
+  'Material',
+  'Brand',
+  'Colour'
+];
+
+const LISTING_TEMPLATE_HINTS = [
+  'Remove this entire row before Process CSV (row 2 is hints only). Timestamp: optional, not imported.',
+  'HTTPS image links only (e.g. Google Drive). Comma-separated, max 5. Files must be shared (e.g. anyone with the link).',
+  'Listing title (required for a good listing).',
+  'Numbers only — no currency symbol.',
+  'Must match Facebook Marketplace category name exactly.',
+  'Must match Facebook exactly (e.g. New, Used – like new).',
+  'Main description text; can include dimensions and why you are selling.',
+  'e.g. List as single item or List as in stock — exact Facebook wording.',
+  'Optional. Comma-separated, max 20 tags.',
+  'e.g. phrases like Public meetup available, Door pick-up — match what you use on the form.',
+  'e.g. Hide from friends and/or Turn off commenting.',
+  'Fills More details → Size when that field appears (depends on category).',
+  'Goes into the assembled listing description only — not the Material dropdown in More details.',
+  'Fills More details → Brand. This is not the listing title column.',
+  'Fills More details → Colour (US forms may use header Color — you can rename the column).'
+];
+
+function escapeCsvCell(value) {
+  const s = value == null ? '' : String(value);
+  if (/[",\n\r]/.test(s)) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function buildListingTemplateCsv() {
+  const headerLine = LISTING_TEMPLATE_HEADERS.map(escapeCsvCell).join(',');
+  const hintLine = LISTING_TEMPLATE_HINTS.map(escapeCsvCell).join(',');
+  const emptyLine = LISTING_TEMPLATE_HEADERS.map(() => '').join(',');
+  return [headerLine, hintLine, emptyLine].join('\r\n');
+}
+
+function downloadListingTemplateCsv() {
+  const csv = '\uFEFF' + buildListingTemplateCsv();
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'marketplace-listing-template.csv';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function setupListingTemplateDownload() {
+  const btn = document.getElementById('download-listing-template-csv');
+  if (!btn) return;
+  btn.addEventListener('click', () => downloadListingTemplateCsv());
+}
+
 function getDescriptionBlockLabel(id) {
   const b = DESCRIPTION_BLOCKS.find((x) => x.id === id);
   return b ? b.label : id;
@@ -285,7 +357,22 @@ function showFieldMapping(headers) {
     '<strong>Confirm each row</strong> and title options, set description layout in section 3, then run <strong>Process CSV</strong> in section 4.';
   mappingList.appendChild(intro);
 
-  const facebookFields = ['title', 'price', 'category', 'condition', 'description', 'size', 'materials'];
+  const facebookFields = [
+    'title',
+    'price',
+    'category',
+    'condition',
+    'description',
+    'size',
+    'materials',
+    'listingBrand',
+    'colour',
+    'sku',
+    'availability',
+    'productTags',
+    'localTransactionOptions',
+    'listingManagement'
+  ];
   facebookFields.forEach((field) => {
     const row = document.createElement('div');
     row.className = 'field-mapping-row';
@@ -995,6 +1082,7 @@ function setupImageUpload() {
 async function init() {
   await new Promise((r) => setTimeout(r, 50));
   setupCSVUpload();
+  setupListingTemplateDownload();
   setupTitleMode();
   setupDescriptionSettingsPanel();
   setupImageUpload();

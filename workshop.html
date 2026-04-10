@@ -300,6 +300,41 @@
     .button-secondary-workshop:hover:not(:disabled) {
       background: #d5d5d5;
     }
+    .csv-form-doc-hint {
+      max-width: 40rem;
+    }
+    .csv-form-doc-hint a {
+      color: #1877f2;
+      word-break: break-all;
+    }
+    .template-download-block {
+      margin-top: 0.75rem;
+      max-width: 40rem;
+      font-size: 0.8125rem;
+      color: #64748b;
+      line-height: 1.45;
+    }
+    .template-download-link {
+      display: inline;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: none;
+      color: #64748b;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .template-download-link:hover {
+      color: #1877f2;
+    }
+    .template-download-meta {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
   </style>
 </head>
 <body>
@@ -320,6 +355,18 @@
         </div>
         <div class="help-text">
           First row must be headers. Map <strong>Image URLs</strong> if you use link-based images; URLs are fetched when you process the CSV.
+        </div>
+        <p class="help-text csv-form-doc-hint">
+          We recommend using <strong>our Google Form</strong> to gather listings so columns match the extension by default. Step-by-step instructions:
+          <a
+            href="https://docs.google.com/document/d/1ogTbbsVhNJHmsUkUYxhvZFzQy3yCc74JKmss3zrHCec/edit?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            >AutoList for Facebook Marketplace — Google Form instructions (Google Doc)</a>.
+        </p>
+        <div class="template-download-block">
+          <button type="button" class="template-download-link" id="download-listing-template-csv">You can also do it locally by downloading a Blank CSV template</button>
+          <span class="template-download-meta">Same headers as the form export; includes a hint row — delete that row before <strong>Process CSV</strong>, then enter your data.</span>
         </div>
         <div id="csv-file-list" class="file-list" style="display: none;"></div>
       </div>

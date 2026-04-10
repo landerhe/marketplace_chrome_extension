@@ -43,12 +43,26 @@ async function fillForm(item, hideFromFriends = false) {
     // Fill fields in sequence
     await fillTitle(item.title);
     await fillPrice(item.price);
+    await delay(300);
     await fillCategory(item.category);
+    await delay(200);
     await fillCondition(item.condition);
     await fillDescription(item);
     await uploadImages(images);
-    await setHideFromFriends(hideFromFriends);
-    
+
+    const lm = parseListingManagementFlags(item.listingManagement);
+    let effectiveHide = hideFromFriends;
+    if (lm.hideFromFriends === true) {
+      effectiveHide = true;
+    }
+
+    await fillMoreDetailsSection(item);
+
+    await setHideFromFriends(effectiveHide);
+    if (lm.turnOffCommenting) {
+      await setTurnOffCommenting(true);
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error filling form:', error);
@@ -133,114 +147,61 @@ function findPriceField() {
   return null;
 }
 
-function findCategoryField() {
-  // Strategy 1: Find by aria-labelledby pointing to a span with "Category" text
-  const categorySpans = Array.from(document.querySelectorAll('span')).filter(el => {
-    const text = el.textContent?.trim().toLowerCase();
-    return text === 'category';
-  });
-  
-  for (const span of categorySpans) {
-    const spanId = span.id;
-    if (spanId) {
-      // Find label/combobox that references this span
-      const field = document.querySelector(`label[aria-labelledby="${spanId}"][role="combobox"], 
-                                            [role="combobox"][aria-labelledby="${spanId}"]`);
-      if (field) return field;
+/**
+ * Facebook often uses aria-labelledby="id1 id2" (multiple IDs). getElementById(labelledBy) fails for that.
+ */
+function comboboxLabelMatches(combobox, labelLower) {
+  const labelledBy = combobox.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const ids = labelledBy.trim().split(/\s+/).filter(Boolean);
+    for (const id of ids) {
+      const ref = document.getElementById(id);
+      if (ref && ref.textContent?.trim().toLowerCase() === labelLower) {
+        return true;
+      }
     }
   }
-  
-  // Strategy 2: Find label with role="combobox" that contains "Category" span
-  for (const span of categorySpans) {
-    // Walk up the DOM to find the combobox
+  const ariaLabel = combobox.getAttribute('aria-label')?.trim().toLowerCase() || '';
+  if (ariaLabel === labelLower || ariaLabel.startsWith(labelLower + ' ')) {
+    return true;
+  }
+  return false;
+}
+
+function findComboboxByLabelText(labelLower) {
+  const labelSpans = Array.from(document.querySelectorAll('span')).filter((el) => {
+    return el.textContent?.trim().toLowerCase() === labelLower;
+  });
+  for (const span of labelSpans) {
+    const box = span.closest('[role="combobox"]');
+    if (box) return box;
     let parent = span.parentElement;
-    let depth = 0;
-    while (parent && depth < 10) {
-      if (parent.getAttribute('role') === 'combobox' || 
-          (parent.tagName === 'LABEL' && parent.getAttribute('role') === 'combobox')) {
+    for (let d = 0; d < 14 && parent; d++) {
+      if (parent.getAttribute('role') === 'combobox') {
         return parent;
       }
       parent = parent.parentElement;
-      depth++;
     }
   }
-  
-  // Strategy 3: Find all comboboxes and check their labels
-  const allComboboxes = document.querySelectorAll('[role="combobox"]');
-  for (const combobox of allComboboxes) {
-    const labelledBy = combobox.getAttribute('aria-labelledby');
-    if (labelledBy) {
-      const labelEl = document.getElementById(labelledBy);
-      if (labelEl && labelEl.textContent?.trim().toLowerCase() === 'category') {
-        return combobox;
-      }
-    }
-    const ariaLabel = combobox.getAttribute('aria-label')?.toLowerCase() || '';
-    if (ariaLabel.includes('category')) {
-      return combobox;
-    }
-    // Check if it contains a span with "Category"
-    if (combobox.querySelector('span')?.textContent?.trim().toLowerCase() === 'category') {
+
+  for (const combobox of document.querySelectorAll('[role="combobox"]')) {
+    if (comboboxLabelMatches(combobox, labelLower)) {
       return combobox;
     }
   }
-  
   return null;
 }
 
+function findCategoryField() {
+  return findComboboxByLabelText('category');
+}
+
 function findConditionField() {
-  // Strategy 1: Find by aria-labelledby pointing to a span with "Condition" text
-  const conditionSpans = Array.from(document.querySelectorAll('span')).filter(el => {
-    const text = el.textContent?.trim().toLowerCase();
-    return text === 'condition';
-  });
-  
-  for (const span of conditionSpans) {
-    const spanId = span.id;
-    if (spanId) {
-      // Find label/combobox that references this span
-      const field = document.querySelector(`label[aria-labelledby="${spanId}"][role="combobox"], 
-                                            [role="combobox"][aria-labelledby="${spanId}"]`);
-      if (field) return field;
-    }
-  }
-  
-  // Strategy 2: Find label with role="combobox" that contains "Condition" span
-  for (const span of conditionSpans) {
-    // Walk up the DOM to find the combobox
-    let parent = span.parentElement;
-    let depth = 0;
-    while (parent && depth < 10) {
-      if (parent.getAttribute('role') === 'combobox' || 
-          (parent.tagName === 'LABEL' && parent.getAttribute('role') === 'combobox')) {
-        return parent;
-      }
-      parent = parent.parentElement;
-      depth++;
-    }
-  }
-  
-  // Strategy 3: Find all comboboxes and check their labels
-  const allComboboxes = document.querySelectorAll('[role="combobox"]');
-  for (const combobox of allComboboxes) {
-    const labelledBy = combobox.getAttribute('aria-labelledby');
-    if (labelledBy) {
-      const labelEl = document.getElementById(labelledBy);
-      if (labelEl && labelEl.textContent?.trim().toLowerCase() === 'condition') {
-        return combobox;
-      }
-    }
-    const ariaLabel = combobox.getAttribute('aria-label')?.toLowerCase() || '';
-    if (ariaLabel.includes('condition')) {
-      return combobox;
-    }
-    // Check if it contains a span with "Condition"
-    if (combobox.querySelector('span')?.textContent?.trim().toLowerCase() === 'condition') {
-      return combobox;
-    }
-  }
-  
-  return null;
+  return findComboboxByLabelText('condition');
+}
+
+function findAvailabilityField() {
+  return findComboboxByLabelText('availability');
 }
 
 function findDescriptionField() {
@@ -334,6 +295,97 @@ function normalizeText(text) {
   return decoded.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function normalizeForDropdownMatch(text) {
+  let n = normalizeText(text).replace(/[\u2013\u2014\u2212\-]/g, '-');
+  n = n.replace(/[\u2018\u2019\u201a\u201b`]/g, "'");
+  return n;
+}
+
+function getComboboxDisplayedValueText(field, labelLower) {
+  const spans = field.querySelectorAll('span[dir="auto"], span.x6ikm8r, span[class*="x6ikm8r"]');
+  let best = '';
+  for (const sp of spans) {
+    const t = sp.textContent?.trim();
+    if (!t || t === '\u00a0' || t === '&nbsp;') continue;
+    const tl = t.toLowerCase();
+    if (tl === labelLower) continue;
+    if (t.length > best.length) best = t;
+  }
+  return best;
+}
+
+function distanceBelowFieldCenter(field, rect) {
+  const fr = field.getBoundingClientRect();
+  const ax = fr.left + fr.width / 2;
+  const ay = fr.bottom;
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top;
+  return Math.hypot(cx - ax, cy - ay);
+}
+
+function findOpenDropdownPortal(field, fieldName) {
+  if (fieldName === 'category') {
+    let best = null;
+    let bestScore = 1e9;
+    for (const dialog of document.querySelectorAll('[role="dialog"]')) {
+      const r = dialog.getBoundingClientRect();
+      if (r.width < 80 || r.height < 80) continue;
+      const buttons = dialog.querySelectorAll('[role="button"]');
+      if (buttons.length < 2) continue;
+      const al = (dialog.getAttribute('aria-label') || '').toLowerCase();
+      const dist = distanceBelowFieldCenter(field, r);
+      const labelBonus =
+        al.includes('drop') || al.includes('menu') || al.includes('list') ? 0 : 250;
+      const score = dist + labelBonus;
+      if (score < bestScore) {
+        bestScore = score;
+        best = dialog;
+      }
+    }
+    return best;
+  }
+
+  let bestLb = null;
+  let bestD = 1e9;
+  for (const lb of document.querySelectorAll('[role="listbox"]')) {
+    const r = lb.getBoundingClientRect();
+    if (r.width < 40 || r.height < 30) continue;
+    if (lb.querySelectorAll('[role="option"]').length === 0) continue;
+    const d = distanceBelowFieldCenter(field, r);
+    if (d < bestD) {
+      bestD = d;
+      bestLb = lb;
+    }
+  }
+  return bestLb;
+}
+
+async function clickToOpenCombobox(field) {
+  field.scrollIntoView({ block: 'center', behavior: 'instant' });
+  await delay(100);
+  const inner =
+    field.querySelector('[tabindex="0"]') ||
+    field.querySelector('[role="button"]') ||
+    field.querySelector('[tabindex="-1"]') ||
+    field;
+  if (inner.focus) {
+    try {
+      inner.focus({ preventScroll: true });
+    } catch (e) {
+      inner.focus();
+    }
+  }
+  inner.dispatchEvent(
+    new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })
+  );
+  inner.dispatchEvent(
+    new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })
+  );
+  inner.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
+  );
+}
+
 // Simplified function to select dropdown option
 async function selectDropdownOption(fieldName, valueToSelect) {
   if (!valueToSelect || !valueToSelect.trim()) {
@@ -341,34 +393,35 @@ async function selectDropdownOption(fieldName, valueToSelect) {
   }
   
   // Find the field
-  const field = fieldName === 'category' ? findCategoryField() : findConditionField();
+  let field = null;
+  if (fieldName === 'category') field = findCategoryField();
+  else if (fieldName === 'condition') field = findConditionField();
+  else if (fieldName === 'availability') field = findAvailabilityField();
   if (!field) {
     console.warn(`${fieldName} field not found`);
     return false;
   }
   
-  const searchValue = normalizeText(valueToSelect.trim());
-  
-  // Check if already selected by looking at the displayed value
-  const displayedSpan = field.querySelector('span.x6ikm8r, span[class*="x6ikm8r"]');
-  if (displayedSpan) {
-    const currentText = displayedSpan.textContent?.trim();
-    if (currentText && currentText !== '&nbsp;') {
-      if (normalizeText(currentText) === searchValue) {
-        console.log(`${fieldName} already set to:`, currentText);
-        return true;
-      }
+  const searchValue = normalizeForDropdownMatch(valueToSelect.trim());
+  const labelLower = fieldName;
+
+  const currentDisplayed = getComboboxDisplayedValueText(field, labelLower);
+  if (currentDisplayed) {
+    if (normalizeForDropdownMatch(currentDisplayed) === searchValue) {
+      console.log(`${fieldName} already set to:`, currentDisplayed);
+      return true;
     }
   }
   
-  // Open the dropdown by clicking
-  field.click();
-  await delay(1000); // Give time for dropdown to render
+  await clickToOpenCombobox(field);
+  await delay(600);
   
-  // Wait for dropdown menu to appear - check for both dialog and listbox patterns
+  // Wait for dropdown menu — prefer portal closest to this combobox (avoids wrong listbox/dialog)
   let dropdownMenu = null;
-  for (let i = 0; i < 10; i++) {
-    // Check for dialog pattern (used by category)
+  for (let i = 0; i < 12; i++) {
+    dropdownMenu = findOpenDropdownPortal(field, fieldName);
+    if (dropdownMenu) break;
+
     const dialogs = document.querySelectorAll('[role="dialog"]');
     for (const dialog of dialogs) {
       const ariaLabel = (dialog.getAttribute('aria-label') || '').toLowerCase();
@@ -380,7 +433,6 @@ async function selectDropdownOption(fieldName, valueToSelect) {
       }
     }
     
-    // Check for listbox pattern (used by condition)
     if (!dropdownMenu) {
       const listboxes = document.querySelectorAll('[role="listbox"]');
       for (const listbox of listboxes) {
@@ -392,13 +444,11 @@ async function selectDropdownOption(fieldName, valueToSelect) {
       }
     }
     
-    // Also check for any visible dropdown container near the field
     if (!dropdownMenu) {
       const fieldRect = field.getBoundingClientRect();
       const allDropdowns = document.querySelectorAll('[role="dialog"], [role="listbox"]');
       for (const dropdown of allDropdowns) {
         const rect = dropdown.getBoundingClientRect();
-        // Check if dropdown is visible and positioned near the field
         if (rect.width > 0 && rect.height > 0 && 
             Math.abs(rect.top - fieldRect.bottom) < 500) {
           dropdownMenu = dropdown;
@@ -411,6 +461,12 @@ async function selectDropdownOption(fieldName, valueToSelect) {
     await delay(200);
   }
   
+  if (!dropdownMenu) {
+    field.click();
+    await delay(400);
+    dropdownMenu = findOpenDropdownPortal(field, fieldName);
+  }
+
   if (!dropdownMenu) {
     console.warn(`${fieldName} dropdown did not open`);
     console.log('Field found:', field);
@@ -425,11 +481,12 @@ async function selectDropdownOption(fieldName, valueToSelect) {
   
   // Pattern 1: role="button" inside dialog (category pattern)
   const allButtons = dropdownMenu.querySelectorAll('[role="button"]:not([aria-disabled="true"])');
-  options = Array.from(allButtons).filter(btn => {
-    // Skip headers
+  options = Array.from(allButtons).filter((btn) => {
     const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
     const text = (btn.textContent || '').toLowerCase();
-    return !ariaLabel.includes('header') && !text.includes('header');
+    if (ariaLabel.includes('header') || text.includes('header')) return false;
+    if (fieldName === 'category' && btn.querySelector('[aria-label*="Header"]')) return false;
+    return true;
   });
   
   // Pattern 2: role="option" inside listbox (condition pattern)
@@ -509,7 +566,7 @@ async function selectDropdownOption(fieldName, valueToSelect) {
     if (!optionText || optionText.length === 0) continue;
     
     // Compare normalized texts
-    const normalizedOption = normalizeText(optionText);
+    const normalizedOption = normalizeForDropdownMatch(optionText);
     console.log(`Comparing "${normalizedOption}" with "${searchValue}"`);
     
     if (normalizedOption === searchValue ||
@@ -560,7 +617,7 @@ async function selectDropdownOption(fieldName, valueToSelect) {
       if (text) {
         availableOptions.push({
           text: text,
-          normalized: normalizeText(text),
+          normalized: normalizeForDropdownMatch(text),
           element: opt
         });
       }
@@ -862,6 +919,224 @@ async function setHideFromFriends(hideFromFriends) {
     // Need to uncheck it
     checkbox.click();
     await delay(300);
+  }
+}
+
+function findMoreDetailsToggle() {
+  for (const btn of document.querySelectorAll('[role="button"]')) {
+    const t = btn.textContent || '';
+    if (t.includes('Attract more interest by including more details')) {
+      return btn;
+    }
+  }
+  for (const btn of document.querySelectorAll('[role="button"]')) {
+    const t = (btn.textContent || '').trim();
+    if (/^more details$/i.test(t) || (t.startsWith('More details') && t.length < 100)) {
+      return btn;
+    }
+  }
+  return null;
+}
+
+async function ensureMoreDetailsExpanded() {
+  const btn = findMoreDetailsToggle();
+  if (!btn) {
+    console.warn('More details toggle not found');
+    return false;
+  }
+  if (btn.getAttribute('aria-expanded') === 'true') {
+    return true;
+  }
+  btn.click();
+  await delay(700);
+  return true;
+}
+
+function findProductTagsTextarea() {
+  const spans = Array.from(document.querySelectorAll('span')).filter((el) => {
+    const text = el.textContent?.trim().toLowerCase();
+    return text === 'product tags';
+  });
+  for (const span of spans) {
+    const label = span.closest('label');
+    if (label) {
+      const ta = label.querySelector('textarea');
+      if (ta) return ta;
+    }
+    let parent = span.parentElement;
+    for (let d = 0; d < 8 && parent; d++) {
+      const ta = parent.querySelector('textarea');
+      if (ta) return ta;
+      parent = parent.parentElement;
+    }
+  }
+  return null;
+}
+
+async function fillProductTagsField(tags) {
+  const ta = findProductTagsTextarea();
+  if (!ta) {
+    console.warn('Product tags field not found');
+    return;
+  }
+  ta.value = String(tags).trim();
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  ta.dispatchEvent(new Event('change', { bubbles: true }));
+  await delay(200);
+}
+
+function parseMeetupCsv(csv) {
+  const s = String(csv).toLowerCase();
+  return {
+    publicMeetup: /\bpublic\s+meetup\b/.test(s) || s.includes('public meetup'),
+    doorPickup:
+      /\bdoor\s+pick/.test(s) ||
+      (s.includes('pick-up') && !/\bdoor\s+drop\b/.test(s) && !s.includes('drop-off')),
+    doorDropoff: /\bdoor\s+drop\b/.test(s) || s.includes('drop-off') || s.includes('drop off')
+  };
+}
+
+function findMeetupCheckboxByLabel(needle) {
+  const lower = needle.toLowerCase();
+  for (const el of document.querySelectorAll('[role="checkbox"]')) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) continue;
+    const t = (el.textContent || '').toLowerCase();
+    if (t.includes(lower)) return el;
+  }
+  return null;
+}
+
+async function setRoleCheckboxWantedState(el, want) {
+  if (!el) return;
+  const checked = el.getAttribute('aria-checked') === 'true';
+  if (checked === want) return;
+  el.click();
+  await delay(250);
+}
+
+async function setMeetupCheckboxesFromCsv(csv) {
+  const flags = parseMeetupCsv(csv);
+  await setRoleCheckboxWantedState(findMeetupCheckboxByLabel('public meetup'), flags.publicMeetup);
+  await setRoleCheckboxWantedState(findMeetupCheckboxByLabel('door pick-up'), flags.doorPickup);
+  await setRoleCheckboxWantedState(findMeetupCheckboxByLabel('door drop-off'), flags.doorDropoff);
+}
+
+function parseListingManagementFlags(raw) {
+  if (!raw || !String(raw).trim()) {
+    return { hideFromFriends: null, turnOffCommenting: false };
+  }
+  const s = String(raw).toLowerCase();
+  const hideFromFriends = s.includes('hide from friends') ? true : null;
+  const turnOffCommenting = /turn off commenting/.test(s);
+  return { hideFromFriends, turnOffCommenting };
+}
+
+function findTurnOffCommentingControl() {
+  const spans = Array.from(document.querySelectorAll('span')).filter(
+    (el) => el.textContent?.trim().toLowerCase() === 'turn off commenting'
+  );
+  for (const span of spans) {
+    let parent = span.parentElement;
+    for (let d = 0; d < 14 && parent; d++) {
+      const sw =
+        parent.querySelector('input[type="checkbox"][role="switch"]') ||
+        parent.querySelector('[role="switch"]');
+      if (sw) return sw;
+      parent = parent.parentElement;
+    }
+  }
+  return null;
+}
+
+async function setTurnOffCommenting(wantOn) {
+  if (!wantOn) return;
+  const c = findTurnOffCommentingControl();
+  if (!c) {
+    console.warn('Turn off commenting control not found');
+    return;
+  }
+  const checked = c.checked || c.getAttribute('aria-checked') === 'true';
+  if (!checked) {
+    c.click();
+    await delay(300);
+  }
+}
+
+async function fillMoreDetailsTextInputByLabel(labelVariants, value) {
+  if (!value || !String(value).trim()) return;
+  const want = new Set(labelVariants.map((v) => v.toLowerCase()));
+  for (const lab of document.querySelectorAll('label')) {
+    if (lab.getAttribute('role') === 'combobox') continue;
+    const spans = lab.querySelectorAll('span');
+    let matched = false;
+    for (const sp of spans) {
+      const t = sp.textContent?.trim().toLowerCase();
+      if (t && want.has(t)) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) continue;
+    const input = lab.querySelector('input[type="text"]');
+    if (!input || input.getAttribute('role') === 'combobox') continue;
+    const aria = (input.getAttribute('aria-label') || '').toLowerCase();
+    if (aria === 'location' || aria.includes('location')) continue;
+    input.value = String(value).trim();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await delay(120);
+    return;
+  }
+}
+
+/**
+ * Category-specific More details: Size, Colour, Brand, SKU as plain text inputs.
+ * Never touches Material combobox — CSV "materials" stays for description assembly only.
+ */
+async function fillMoreDetailsCategoryTextFields(item) {
+  if (item.size && String(item.size).trim()) {
+    await fillMoreDetailsTextInputByLabel(['size'], item.size);
+  }
+  if (item.colour && String(item.colour).trim()) {
+    await fillMoreDetailsTextInputByLabel(['colour', 'color'], item.colour);
+  }
+  if (item.listingBrand && String(item.listingBrand).trim()) {
+    await fillMoreDetailsTextInputByLabel(['brand'], item.listingBrand);
+  }
+  if (item.sku && String(item.sku).trim()) {
+    await fillMoreDetailsTextInputByLabel(['sku'], item.sku);
+  }
+}
+
+async function fillMoreDetailsSection(item) {
+  const hasCategoryTexts =
+    (item.size && String(item.size).trim()) ||
+    (item.colour && String(item.colour).trim()) ||
+    (item.listingBrand && String(item.listingBrand).trim()) ||
+    (item.sku && String(item.sku).trim());
+  const hasExtra =
+    hasCategoryTexts ||
+    (item.availability && String(item.availability).trim()) ||
+    (item.productTags && String(item.productTags).trim()) ||
+    (item.localTransactionOptions && String(item.localTransactionOptions).trim());
+  if (!hasExtra) return;
+
+  await ensureMoreDetailsExpanded();
+  await delay(550);
+
+  await fillMoreDetailsCategoryTextFields(item);
+  await delay(200);
+
+  if (item.availability && String(item.availability).trim()) {
+    await selectDropdownOption('availability', item.availability);
+    await delay(300);
+  }
+  if (item.productTags && String(item.productTags).trim()) {
+    await fillProductTagsField(item.productTags);
+  }
+  if (item.localTransactionOptions && String(item.localTransactionOptions).trim()) {
+    await setMeetupCheckboxesFromCsv(item.localTransactionOptions);
   }
 }
 
