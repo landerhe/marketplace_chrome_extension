@@ -1,86 +1,77 @@
-# Facebook Marketplace Auto-Fill Chrome Extension
+# AutoList for Facebook Marketplace 🛒
 
-A Chrome extension that automatically fills Facebook Marketplace listing forms from CSV files and images. Upload your product data as CSV, match images with a simple naming convention, and let the extension fill forms automatically.
+> **A fast, privacy-first Chrome Extension (Manifest V3) that automates Facebook Marketplace listing forms from CSV files and local images.**
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Manifest: V3](https://img.shields.io/badge/Manifest-V3-orange.svg)]()
+[![Privacy: 100% Client--Side](https://img.shields.io/badge/Privacy-100%25%20Local-success.svg)]()
 
-- **CSV Upload**: Upload your product data as CSV files with flexible column mapping
-- **Image Matching**: Automatically match images to products using naming convention
-- **Flexible Field Mapping**: Auto-detect or manually map CSV columns to Facebook fields
-- **Drag & Drop**: Easily upload CSV files and images via drag-and-drop
-- **No Value Transformation**: Uses your exact values - no automatic conversions
-- **Smart Field Filling**: Automatically fills Facebook Marketplace forms with your data
+---
 
-## Installation
+## 🌟 Overview
 
-1. Download or clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" (toggle in top right)
-4. Click "Load unpacked"
-5. Select the `marketplace_chrome_extension` folder
-6. The extension should now appear in your extensions list
+Listing dozens or hundreds of items on Facebook Marketplace manually is tedious and repetitive. 
 
-## Quick Start
+**AutoList** streamlines this workflow:
+- **Bulk CSV Upload**: Drag and drop your inventory CSV with flexible column auto-detection.
+- **Smart Image Matching**: Pair photos with product listings automatically using simple filename rules.
+- **Form Auto-Fill**: Fill titles, prices, categories, conditions, descriptions, tags, and images in one click.
+- **100% Client-Side Privacy**: All processing runs locally inside your browser. No external tracking, no backend servers, no analytics.
 
-1. **Prepare your CSV file** with product data (see [CSV Format Guide](HELP.md#csv-format-guide))
-2. **Name your images** using the format: `Row{number}_{identifier}_{number}.{ext}` (see [Image Naming Guide](HELP.md#image-naming))
-3. Navigate to Facebook Marketplace create page: `https://www.facebook.com/marketplace/create/listing`
-4. Click the extension icon in your Chrome toolbar
-5. Upload your CSV file in the "CSV" tab
-6. Upload your images in the "Images" tab
-7. Select an item and click "Fill Form"
+---
 
-## CSV Format
+## 🚀 Installation
 
-Your CSV file should contain columns for:
-- Title (required)
-- Price (required)
-- Category (optional, must match Facebook's exact category names)
-- Condition (optional, must match Facebook's exact condition names)
-- Description (optional)
-- Size (optional)
-- Materials (optional)
+1. Clone or download this repository:
+   ```bash
+   git clone https://github.com/landerhe/marketplace_chrome_extension.git
+   ```
+2. Open Google Chrome and navigate to `chrome://extensions/`.
+3. Enable **Developer mode** (toggle in the top-right corner).
+4. Click **Load unpacked**.
+5. Select the `marketplace_chrome_extension` folder.
+6. The extension icon will appear in your Chrome toolbar.
 
-See [HELP.md](HELP.md) for detailed CSV format instructions and examples.
+---
 
-## Image Naming Convention
+## ⚡ Quick Start
 
-Images should be named: `Row{rowNumber}_{identifier}_{imageNumber}.{ext}`
+1. **Prepare your CSV file**: Check out [`samples_for_dev/sample_products.csv`](samples_for_dev/sample_products.csv) or read [HELP.md](HELP.md#csv-format-guide).
+2. **Name your images**: Use the convention: `Row{number}_{identifier}_{number}.{ext}` (e.g. `Row1_Oak_Table_1.jpg`).
+3. Open Facebook Marketplace listing creation page:  
+   `https://www.facebook.com/marketplace/create/listing`
+4. Click the AutoList extension icon in Chrome toolbar.
+5. Upload your CSV and drag your product images.
+6. Select an item from the list and click **Fill Form**.
 
-Example: `Row11_Andrea Martin furry jacket Printed on the back_1.jpg`
+---
 
-See [HELP.md](HELP.md#image-naming) for detailed image naming instructions.
+## 📁 Repository Structure
 
-## File Structure
+```
+marketplace_chrome_extension/
+├── manifest.json            # Manifest V3 extension configuration
+├── popup.html / popup.js    # Extension popup interface & file handlers
+├── workshop.html / .js      # Full-page bulk inspection & mapper workshop
+├── content.js               # Injected DOM filler for Facebook Marketplace
+├── csvParser.js             # High-resilience CSV delimiter & quote parser
+├── fieldMapper.js           # Smart column-to-marketplace attribute mapping
+├── imageMatcher.js          # Filename regex matcher & IndexedDB image binder
+├── storageManager.js        # Local IndexedDB & chrome.storage management
+├── samples_for_dev/         # Sanitized sample CSV & reference HTML fixtures
+└── HELP.md                  # Comprehensive troubleshooting and format guide
+```
 
-- `manifest.json` - Extension configuration
-- `popup.html` - Extension popup UI
-- `popup.js` - Popup logic and file handling
-- `content.js` - Content script that fills the Facebook form
-- `csvParser.js` - CSV parsing and delimiter detection
-- `fieldMapper.js` - CSV column to Facebook field mapping
-- `imageMatcher.js` - Image filename parsing and matching
-- `storageManager.js` - IndexedDB and chrome.storage management
-- `utils.js` - Utility functions
+---
 
-## Important Notes
+## 🔒 Privacy & Data Guarantee
 
-- **Field Values**: The extension does NOT transform values. Use Facebook's exact field names for Category and Condition.
-- **Image Storage**: Images are stored in your browser's IndexedDB. Clear browser data will remove them.
-- **CSV Size**: Maximum CSV file size is 10MB
-- **Image Size**: Maximum 10MB per image
-- **Image Formats**: Supported formats: JPG, PNG, WEBP, HEIC, HEIF
+- **Zero Remote Tracking**: This extension does not connect to any third-party analytics or external database.
+- **Local Storage**: All product CSVs and image blobs reside exclusively in your browser's local `IndexedDB` and `chrome.storage.local`.
+- **Open Source**: Full transparency under the permissive MIT license.
 
-## Troubleshooting
+---
 
-See [HELP.md](HELP.md#troubleshooting) for detailed troubleshooting guide.
+## 📄 License
 
-Common issues:
-- Form fields not found: Make sure you're on the Facebook Marketplace create page
-- Images not matching: Check your image naming format matches the convention
-- CSV not processing: Verify CSV format and that headers are on the first row
-- Field values not filling: Ensure values exactly match Facebook's field options
-
-## Support
-
-For detailed help and examples, see [HELP.md](HELP.md).
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
